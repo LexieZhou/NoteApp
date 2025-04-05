@@ -122,6 +122,8 @@ const NotePanel = () => {
         </TouchableOpacity>
       </View>
 
+      <View style={{width: 1, backgroundColor: '#737373'}} />
+
       <View
         style={styles.canvas}
         ref={canvasRef}
@@ -184,14 +186,19 @@ const NotePanel = () => {
             />
           </TouchableOpacity>
         ))}
-      </View>
-
-      <View style={styles.footer}>
-        <Button title="Add Image" onPress={handleAddImage} />
-        {selectedImage && (
-          <Button title="Delete Image" onPress={handleDeleteImage} color="red" />
+        <View style={styles.footer}>
+        {selectedImage ? (
+          <TouchableOpacity onPress={handleDeleteImage} style={styles.deleteImageButton}>
+            <Text style={styles.buttonText}>Delete Image</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={handleAddImage} style={styles.insertImageButton}>
+            <Text style={styles.buttonText}>Insert Image</Text>
+          </TouchableOpacity>
         )}
       </View>
+      </View>
+      
     </View>
   );
 };
@@ -199,12 +206,14 @@ const NotePanel = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#080808',
   },
   toolbar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'flex-start',
+    gap: 10,
     padding: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#0a0a0a',
   },
   button: {
     padding: 10,
@@ -213,7 +222,9 @@ const styles = StyleSheet.create({
   },
   canvas: {
     flex: 1,
-    backgroundColor: '#fff',
+    marginLeft: 5,
+    marginRight: 5,
+    backgroundColor: '#17171a',
   },
   textBox: {
     position: 'absolute',
@@ -223,9 +234,29 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 10,
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+    // backgroundColor: '#2e2b2b',
   },
+  insertImageButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+  },
+  deleteImageButton: {
+    backgroundColor: '#e8171e',
+    padding: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  buttonText: {
+    color: '#fff',
+  }
 });
 
 export default NotePanel;

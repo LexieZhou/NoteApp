@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 
 interface Message {
   id: number;
@@ -25,6 +26,11 @@ const ChatPanel = () => {
     const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState('key0');
+  const models = [
+    { label: "Model 1", value: 'key0' },
+    { label: "Model 2", value: 'key1' },
+  ];
 
   const handleSend = () => {
     if (!input.trim() && selectedImages.length === 0) return;
@@ -80,19 +86,34 @@ const ChatPanel = () => {
         contentContainerStyle={styles.messageList}
       />
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Type your message..."
-        />
-        <TouchableOpacity onPress={handleImageSelect} style={styles.imageButton}>
-          <Text style={styles.buttonText}>Add Image</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-          <Text style={styles.buttonText}>Send</Text>
-        </TouchableOpacity>
+      <View style={styles.footer}>
+        <View>
+          <Picker
+            selectedValue={selectedModel}
+            onValueChange={(itemValue) => setSelectedModel(itemValue)}
+            mode="dropdown"
+            style={styles.picker}
+          >
+            {models.map((model) => (
+              <Picker.Item key={model.value} label={model.label} value={model.value} />
+            ))}
+          </Picker>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type your message..."
+          />
+          <TouchableOpacity onPress={handleImageSelect} style={styles.imageButton}>
+            <Text style={styles.buttonText}>Add Image</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
+            <Text style={styles.buttonText}>Send</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {selectedImages.length > 0 && (
         <ScrollView horizontal style={styles.selectedImagesContainer}>
@@ -121,7 +142,7 @@ const ChatPanel = () => {
 const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#fff',
+      backgroundColor: '#080808',
     },
     messageList: {
       padding: 10,
@@ -134,14 +155,14 @@ const styles = StyleSheet.create({
     },
     userMessage: {
       alignSelf: 'flex-end',
-      backgroundColor: '#007bff',
+      backgroundColor: '#7b87ab',
     },
     aiMessage: {
       alignSelf: 'flex-start',
-      backgroundColor: '#e5e5ea',
+      backgroundColor: '#4f5157',
     },
     messageText: {
-      color: '#fff',
+      color: '#ffffff',
     },
     imageContainer: {
       marginTop: 5,
@@ -154,12 +175,25 @@ const styles = StyleSheet.create({
         marginRight: 5,
         borderRadius: 5,
       },
-      inputContainer: {
-        flexDirection: 'row',
+      footer: {
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
         alignItems: 'center',
         padding: 10,
         borderTopWidth: 1,
         borderColor: '#ccc',
+      },
+      picker: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        height: 40,
+        width: 440,
+      },
+      inputContainer: {
+        flexDirection: 'row',
+        alignItems:'center',
+        padding: 10
       },
       textInput: {
         flex: 1,
