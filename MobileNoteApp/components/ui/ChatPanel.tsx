@@ -9,7 +9,8 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import DropDownPicker from 'react-native-dropdown-picker';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 interface Message {
   id: number;
@@ -23,14 +24,28 @@ interface Message {
 }
 
 const ChatPanel = () => {
-    const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState('key0');
-  const models = [
-    { label: "Model 1", value: 'key0' },
-    { label: "Model 2", value: 'key1' },
-  ];
+  // model picker
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(null);
+  const [items, setItems] = useState([
+    {label: 'GPT-4o', value: 'GPT-4o'},
+    {label: 'GPT-4', value: 'GPT-4'},
+    {label: 'Qwen-2.5', value: 'Qwen-2.5'},
+    {label: 'Claude-3.7', value: 'Claude-3.7'},
+  ]);
+
+  // file picker
+  const [fileOpen, setFileOpen] = useState(false);
+  const [fileValue, setFileValue] = useState([]);
+  const [fileItems, setFileItems] = useState([
+    {label: 'file1', value: 'file1'},
+    {label: 'file2', value: 'file2'},
+    {label: 'file3', value: 'file3'},
+    {label: 'file4', value: 'file4'},
+  ]);
 
   const handleSend = () => {
     if (!input.trim() && selectedImages.length === 0) return;
@@ -87,17 +102,56 @@ const ChatPanel = () => {
       />
 
       <View style={styles.footer}>
-        <View>
-          <Picker
-            selectedValue={selectedModel}
-            onValueChange={(itemValue) => setSelectedModel(itemValue)}
-            mode="dropdown"
-            style={styles.picker}
-          >
-            {models.map((model) => (
-              <Picker.Item key={model.value} label={model.label} value={model.value} />
-            ))}
-          </Picker>
+        <View style={styles.picker}>
+        <DropDownPicker
+          placeholder="Select a model"
+          open={open}
+          value={value}
+          items={items}
+          // theme={"DARK"}
+          setOpen={setOpen}
+          setValue={setValue}
+          setItems={setItems}
+          style={{
+            borderColor: '#757474',
+            borderRadius: 5,
+            backgroundColor: '#080808',
+          }}
+          containerStyle={{width: 160}}
+          textStyle={{
+            color: '#FFFFFF',
+            fontSize: 16,
+          }}
+          dropDownContainerStyle={{
+            backgroundColor: '#080808',
+          }}
+          />
+          <DropDownPicker
+            placeholder="Attach files"
+            multiple={true}
+            min={0}
+            max={5}
+            open={fileOpen}
+            value={fileValue}
+            items={fileItems}
+            // theme={"DARK"}
+            setOpen={setFileOpen}
+            setValue={setFileValue}
+            setItems={setFileItems}
+            style={{
+              borderColor: '#757474',
+              borderRadius: 5,
+              backgroundColor: '#080808',
+            }}
+            containerStyle={{width: 240}}
+            textStyle={{
+              color: '#FFFFFF',
+              fontSize: 16,
+            }}
+            dropDownContainerStyle={{
+              backgroundColor: '#080808',
+            }}
+          />
         </View>
 
         <View style={styles.inputContainer}>
@@ -107,12 +161,15 @@ const ChatPanel = () => {
             onChangeText={setInput}
             placeholder="Type your message..."
           />
-          <TouchableOpacity onPress={handleImageSelect} style={styles.imageButton}>
-            <Text style={styles.buttonText}>Add Image</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-            <Text style={styles.buttonText}>Send</Text>
-          </TouchableOpacity>
+          <View style={styles.imageButton}>
+          <FontAwesome.Button name="image" size={18} backgroundColor="gray" onPress={handleImageSelect} >
+          </FontAwesome.Button>
+          </View>
+          <View style={styles.sendButton}>
+          <FontAwesome.Button name="paper-plane" size={18} backgroundColor="#007bff" onPress={handleSend} >
+            Send
+          </FontAwesome.Button>
+          </View>
         </View>
       </View>
       {selectedImages.length > 0 && (
@@ -170,49 +227,48 @@ const styles = StyleSheet.create({
       flexWrap: 'wrap',
     },
     messageImage: {
-        width: 100,
-        height: 100,
-        marginRight: 5,
-        borderRadius: 5,
-      },
-      footer: {
-        flexDirection: 'column',
-        justifyContent: 'flex-start',
-        alignItems: 'center',
-        padding: 10,
-        borderTopWidth: 1,
-        borderColor: '#ccc',
-      },
-      picker: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        height: 40,
-        width: 440,
-      },
-      inputContainer: {
-        flexDirection: 'row',
-        alignItems:'center',
-        padding: 10
-      },
+      width: 100,
+      height: 100,
+      marginRight: 5,
+      borderRadius: 5,
+    },
+    footer: {
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'flex-start',
+      padding: 20,
+      borderTopWidth: 1,
+      borderColor: '#757474',
+    },
+    picker: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 20,
+      marginRight: 10,
+      marginLeft: 10,
+      marginBottom: 10,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems:'center',
+      padding: 10
+    },
       textInput: {
         flex: 1,
         borderWidth: 1,
-        borderColor: '#ccc',
+        borderColor: '#757474',
         borderRadius: 5,
         padding: 10,
         marginRight: 10,
       },
       imageButton: {
-        backgroundColor: '#6c757d',
-        padding: 10,
+        backgroundColor: 'black',
         borderRadius: 5,
-        marginRight: 10,
       },
       sendButton: {
         backgroundColor: '#007bff',
-        padding: 10,
         borderRadius: 5,
+        marginLeft: 10,
       },
       buttonText: {
         color: '#fff',

@@ -1,11 +1,20 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
 export default function AppBar() {
   return (
     <View style={styles.appBar}>
       <Text style={styles.title}>OmniNote</Text>
-      {/* Add additional components like buttons/icons here if needed */}
+      
+      <TouchableOpacity style={styles.headerButton}>
+        <Text style={styles.buttonText}>FILE</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.headerButton}>
+        <Text style={styles.buttonText}>EDIT</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.headerButton}>
+        <Text style={styles.buttonText}>SETTINGS</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -25,4 +34,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     flex: 1, // Makes the title take up available space
   },
+  headerButton: {
+    marginLeft: 10,
+    padding: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold'
+  }
 });

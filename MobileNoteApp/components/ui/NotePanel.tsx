@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   Alert,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import { Svg, Path } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 enum TextBoxState {
   UNSELECTED = 'unselected',
@@ -41,14 +43,57 @@ interface ImageElement {
   uri: string;
 }
 
+// Each stroke is just an array of [x, y] points
+type Stroke = { x: number; y: number }[];
+
+// Convert an array of points into an SVG path string
+function pointsToSvgPath(points: Stroke): string {
+  if (points.length === 0) return '';
+  // Move to first point, then line-to every subsequent point
+  const d = points.map((p, i) => (i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`));
+  return d.join(' ');
+}
+
 const NotePanel = () => {
   const [mode, setMode] = useState<'text' | 'draw' | 'pan'>('pan');
+  // ========== Text Boxes ==========
   const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
   const [selectedTextBox, setSelectedTextBox] = useState<string | null>(null);
+  // ========== Images ==========
   const [images, setImages] = useState<ImageElement[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  // ========== Drawing Strokes ==========
+  const [paths, setPaths] = useState<Stroke[]>([]); // all strokes
+  const [currentPath, setCurrentPath] = useState<Stroke>([]); // current stroke being drawn
+
 
   const canvasRef = useRef<View>(null);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => mode === 'draw',
+    onMoveShouldSetPanResponder: () => mode === 'draw',
+    onPanResponderGrant: (evt) => {
+      console.log("Drawing started");
+      const x = evt.nativeEvent.locationX;
+      const y = evt.nativeEvent.locationY;
+      setCurrentPath([{ x, y }]);
+    },
+    onPanResponderMove: (evt) => {
+      const x = evt.nativeEvent.locationX;
+      const y = evt.nativeEvent.locationY;
+      setCurrentPath((prev) => [...prev, { x, y }]);
+    },
+    onPanResponderRelease: () => {
+      console.log("Drawing finished");
+      setPaths((prev) => [...prev, currentPath]);
+      setCurrentPath([]);
+    },
+  }), [mode, currentPath]);
+  
+
+  const handleUndo = () => {
+    setPaths((prev) => prev.slice(0, -1));
+  };
 
   const handleCanvasPress = (e: any) => {
     if (mode === 'text') {
@@ -73,6 +118,11 @@ const NotePanel = () => {
     if (mode === 'text') {
       setSelectedTextBox(id);
     }
+  };
+
+  const handleStyleChange = (event: React.MouseEvent<HTMLElement>, id: string) => {
+    setSelectedTextBox(id);
+    // setStyleAnchorEl(event.currentTarget);
   };
 
   const handleImagePress = (id: string) => {
@@ -108,41 +158,68 @@ const NotePanel = () => {
     }
   };
 
+
   return (
     <View style={styles.container}>
       <View style={styles.toolbar}>
-        <TouchableOpacity onPress={() => setMode('pan')} style={styles.button}>
-          <Text>Pan</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setMode('text')} style={styles.button}>
-          <Text>Text</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setMode('draw')} style={styles.button}>
-          <Text>Draw</Text>
-        </TouchableOpacity>
+          <FontAwesome.Button name="hand-grab-o" size={18} backgroundColor={mode === 'pan' ? 'gray' : 'black'} onPress={() => setMode('pan')} style={styles.button} >
+            Pan Mode
+          </FontAwesome.Button>
+          <FontAwesome.Button name="text-height" size={18} backgroundColor={mode === 'text' ? 'gray' : 'black'} onPress={() => setMode('text')} style={styles.button} >
+            Text Mode
+          </FontAwesome.Button>
+          <FontAwesome.Button name="paint-brush" size={18} backgroundColor={mode === 'draw' ? 'gray' : 'black'} onPress={() => setMode('draw')} style={styles.button}>
+            Draw Mode
+          </FontAwesome.Button>
       </View>
 
-      <View style={{width: 1, backgroundColor: '#737373'}} />
+      {/* === Divider === */}
+      <View style={{ width: 2, backgroundColor: 'gray', marginVertical: 5 }} />
 
       <View
         style={styles.canvas}
         ref={canvasRef}
         onStartShouldSetResponder={() => true}
         onResponderRelease={handleCanvasPress}
+        {...(mode === 'draw' ? panResponder.panHandlers : {})}
       >
+        <Svg style={StyleSheet.absoluteFill}>
+          {paths.map((stroke, idx) => (
+            <Path
+              key={`stroke-${idx}-${Math.random()}`}
+              d={pointsToSvgPath(stroke)}
+              stroke="white"
+              strokeWidth={3}
+              fill="none"
+            />
+          ))}
+          {/* Optionally, render the currentPath being drawn */}
+          {currentPath.length > 0 && (
+            <Path
+              d={pointsToSvgPath(currentPath)}
+              stroke="white"
+              strokeWidth={3}
+            />
+          )}
+        </Svg>
+              
+
+        {/* Render text boxes */}
         {textBoxes.map((box) => (
           <View
             key={box.id}
+          >
+            <View
             style={[
               styles.textBox,
               {
                 left: box.x,
                 top: box.y,
                 width: box.width,
-                borderColor: selectedTextBox === box.id ? 'blue' : 'gray',
+                borderColor: selectedTextBox === box.id ? '#6a99e6' : 'gray',
               },
             ]}
-          >
+            >
             <TextInput
               style={{
                 fontSize: box.fontSize,
@@ -160,9 +237,15 @@ const NotePanel = () => {
               }
               onFocus={() => handleTextBoxPress(box.id)}
             />
+            </View>
+            {mode === 'text' && selectedTextBox === box.id && (
+              <FontAwesome.Button name="edit" size={18} backgroundColor="black" onPress={() => handleStyleChange} >
+            </FontAwesome.Button>
+            )}
           </View>
         ))}
 
+        {/* Render images */}
         {images.map((img) => (
           <TouchableOpacity
             key={img.id}
@@ -186,6 +269,7 @@ const NotePanel = () => {
             />
           </TouchableOpacity>
         ))}
+
         <View style={styles.footer}>
         {selectedImage ? (
           <TouchableOpacity onPress={handleDeleteImage} style={styles.deleteImageButton}>
@@ -211,14 +295,15 @@ const styles = StyleSheet.create({
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    gap: 10,
+    gap: 5,
     padding: 10,
     backgroundColor: '#0a0a0a',
   },
   button: {
     padding: 10,
-    backgroundColor: '#ddd',
     borderRadius: 5,
+    borderColor: '#757474',
+    borderWidth: 1,
   },
   canvas: {
     flex: 1,
@@ -230,7 +315,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 1,
     padding: 5,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   footer: {
     padding: 10,

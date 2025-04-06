@@ -1,8 +1,8 @@
 import { Text, View } from "react-native";
 import React from "react";
-import MenuBar from "../components/ui/MenuBar";
-import ChatPanel from "../components/ui/ChatPanel";
-import NotePanel from "../components/ui/NotePanel";
+import MenuBar from "../../components/ui/MenuBar";
+import ChatPanel from "../../components/ui/ChatPanel";
+import NotePanel from "../../components/ui/NotePanel";
 import { SafeAreaView, StyleSheet } from 'react-native';
 
 const Separator = () => <View style={styles.separator} />;
