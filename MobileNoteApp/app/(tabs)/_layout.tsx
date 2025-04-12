@@ -7,11 +7,13 @@ import { IconSymbol } from '../../components/ui/IconSymbol';
 import TabBarBackground from '../../components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { FileManagementProvider } from '../../contexts/FileManagementContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
+    <FileManagementProvider>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
@@ -27,21 +29,22 @@ export default function TabLayout() {
         }),
       }}>
       <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          headerShown: false,
-          tabBarIcon: ({ color }) => <IconSymbol size={25} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="file"
+        name="fileManagement"
         options={{
           title: 'File',
           headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol size={25} name="folder" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Note',
+          headerShown: false,
+          tabBarIcon: ({ color }) => <IconSymbol size={25} name="house.fill" color={color} />,
+        }}
+      />
     </Tabs>
+    </FileManagementProvider>
   );
 }

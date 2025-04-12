@@ -89,7 +89,67 @@ const NotePanel = () => {
       setCurrentPath([]);
     },
   }), [mode, currentPath]);
-  
+
+  // Create a ref to store the initial position of the selected textbox when dragging starts.
+  const selectedTextBoxInitial = useRef({ x: 0, y: 0 });
+  const selectedTextBoxRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedTextBoxRef.current = selectedTextBox;
+  }, [selectedTextBox]);
+
+  // In your component, define the pan responder for textboxes:
+  const textBoxPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => {
+        console.log('onStartShouldSetPanResponder called');
+        return mode === 'pan'; // Ensure this returns true in pan mode
+      },
+      onMoveShouldSetPanResponder: () => mode === 'pan',
+      onPanResponderGrant: (evt, gestureState) => {
+        const boxId = selectedTextBox;
+        console.log('Pan started for textbox:', boxId);
+        console.log('All textbox IDs:', textBoxes.map(b => b.id));
+        
+        const currentBox = textBoxes.find(b => b.id === boxId);
+        if (currentBox) {
+          selectedTextBoxInitial.current = { 
+            x: currentBox.x || 0, 
+            y: currentBox.y || 0 
+          };
+          console.log('Initial position:', selectedTextBoxInitial.current);
+        } else {
+          console.error('Could not find textbox with ID:', boxId);
+          console.error('TextBoxes array:', JSON.stringify(textBoxes));
+        }
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const newX = selectedTextBoxInitial.current.x + gestureState.dx;
+        const newY = selectedTextBoxInitial.current.y + gestureState.dy;
+        // console.log('New position:', { x: newX, y: newY });
+      
+        // Use the ref value in the update
+        setTextBoxes(prevTextBoxes => {
+          const updatedTextBoxes = prevTextBoxes.map(box =>
+            box.id === selectedTextBoxRef.current
+              ? { ...box, x: newX, y: newY }
+              : box
+          );
+          // console.log('Updated textBoxes:', updatedTextBoxes);
+          return updatedTextBoxes;
+        });
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Optionally update any final state or perform cleanup.
+        console.log('Textbox dragging finished');
+      },
+    })
+  );
+
+  // console.log('textBoxPanResponder:', textBoxPanResponder.current);
+
+  useEffect(() => {
+    console.log('Rendering with textBoxes:', textBoxes);
+  }, [textBoxes]);
 
   const handleUndo = () => {
     setPaths((prev) => prev.slice(0, -1));
@@ -115,11 +175,9 @@ const NotePanel = () => {
   };
 
   const handleTextBoxPress = (id: string) => {
-    if (mode === 'text') {
-      setSelectedTextBox(id);
-    }
+    console.log('TextBox pressed:', id);
+    setSelectedTextBox(id);
   };
-
   const handleStyleChange = (event: React.MouseEvent<HTMLElement>, id: string) => {
     setSelectedTextBox(id);
     // setStyleAnchorEl(event.currentTarget);
@@ -171,6 +229,9 @@ const NotePanel = () => {
           <FontAwesome.Button name="paint-brush" size={18} backgroundColor={mode === 'draw' ? 'gray' : 'black'} onPress={() => setMode('draw')} style={styles.button}>
             Draw Mode
           </FontAwesome.Button>
+          <FontAwesome.Button name="undo" size={18} backgroundColor={'black'} onPress={handleUndo} style={styles.button}>
+            Undo
+          </FontAwesome.Button>
       </View>
 
       {/* === Divider === */}
@@ -205,43 +266,44 @@ const NotePanel = () => {
               
 
         {/* Render text boxes */}
-        {textBoxes.map((box) => (
+        { textBoxes.map((box) => (
           <View
             key={box.id}
-          >
-            <View
             style={[
               styles.textBox,
               {
+                position: 'absolute',
                 left: box.x,
                 top: box.y,
                 width: box.width,
                 borderColor: selectedTextBox === box.id ? '#6a99e6' : 'gray',
+                zIndex: 10,
               },
             ]}
+            {...(mode === 'pan' && selectedTextBox === box.id
+              ? textBoxPanResponder.current.panHandlers
+              : {})}
+          >
+            <TouchableOpacity
+              onPress={() => handleTextBoxPress(box.id)}
             >
-            <TextInput
-              style={{
-                fontSize: box.fontSize,
-                color: box.color,
-                fontWeight: box.isBold ? 'bold' : 'normal',
-                fontStyle: box.isItalic ? 'italic' : 'normal',
-              }}
-              value={box.text}
-              onChangeText={(text) =>
-                setTextBoxes((prev) =>
-                  prev.map((b) =>
-                    b.id === box.id ? { ...b, text } : b
+              <TextInput
+                style={{
+                  fontSize: box.fontSize,
+                  color: box.color,
+                  fontWeight: box.isBold ? 'bold' : 'normal',
+                  fontStyle: box.isItalic ? 'italic' : 'normal',
+                }}
+                value={box.text}
+                onChangeText={(text) =>
+                  setTextBoxes((prev) =>
+                    prev.map((b) => (b.id === box.id ? { ...b, text } : b))
                   )
-                )
-              }
-              onFocus={() => handleTextBoxPress(box.id)}
-            />
-            </View>
-            {mode === 'text' && selectedTextBox === box.id && (
-              <FontAwesome.Button name="edit" size={18} backgroundColor="black" onPress={() => handleStyleChange} >
-            </FontAwesome.Button>
-            )}
+                }
+                editable={mode === 'text' && selectedTextBox === box.id}
+                pointerEvents={mode === 'text' ? 'auto' : 'none'}
+              />
+            </TouchableOpacity>
           </View>
         ))}
 
@@ -306,6 +368,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   canvas: {
+    position: 'relative',
     flex: 1,
     marginLeft: 5,
     marginRight: 5,
