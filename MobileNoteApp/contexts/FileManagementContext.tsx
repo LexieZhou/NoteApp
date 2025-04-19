@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
+import api from "../hooks/api";
 
 /**
  * Types
@@ -96,7 +97,7 @@ const FileManagementContext = createContext<FileManagementContextType | undefine
 export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-    const [state, setState] = useState<FileManagementState>(initialTestData);
+  const [state, setState] = useState<FileManagementState>(initialTestData);
 
   /**
    * Initial bootstrap: ensure projects directory exists and load saved state.
@@ -155,11 +156,13 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
   /**
    * Pick a file via system picker and copy into current folder
    */
-  const pickAndUploadFile = async () => {
+  const pickAndUploadFile = async (): Promise<void> => {
     if (!state.currentFolder) return;
     const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: false });
     if (!res.canceled) {
+      try {
         const successResult = res as DocumentPicker.DocumentPickerSuccessResult;
+        const file = successResult.assets[0];
             
         const fileUri = successResult.assets[0].uri;
         const fileName = successResult.assets[0].name ?? `file_${Date.now()}`;
@@ -187,7 +190,10 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
               files: [...state.currentFolder!.files, newFile],
             },
         }));
+        } catch (error) {
+          console.error("Error uploading file:", error);
         }
+    }
   };
 
   const deleteFile = async (fileId: string) => {
