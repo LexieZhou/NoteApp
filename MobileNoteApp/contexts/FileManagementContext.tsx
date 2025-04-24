@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
-import api from "../hooks/api";
+import { canvasAPI } from "../hooks/api";
 
 /**
  * Types
@@ -10,16 +10,28 @@ import api from "../hooks/api";
 export interface FileItem {
   id: string;
   name: string;
-  type: "canvas" | "file";
+  type: "file" | "canvas";
   path: string;
   size?: number;
   lastModified?: Date;
+}
+export interface CanvaItem {
+  id: string;
+  title: string;
+  height: number;
+  width: number;
+  background_color: string;
+  created_at: string;
+  updated_at: string;
+  elements: any[];
+  files: any[];
+  markdown_content: string;
 }
 
 export interface CanvasFolder {
   id: string;
   name: string;
-  canvasFile: FileItem;
+  canvasFile: CanvaItem;
   files: FileItem[];
 }
 
@@ -49,11 +61,16 @@ const initialTestData: FileManagementState = {
         id: '1',
         name: 'Project 1',
         canvasFile: {
-          id: 'canvas1',
-          name: 'Canvas 1',
-          type: 'canvas',
-          path: '/canvas1',
-          lastModified: new Date(Date.now()),
+          "background_color": "#FFFFFF",
+          "created_at": "2025-04-24T23:17:30.113977",
+          "elements": [],
+          "files": [],
+          "height": 600,
+          "id": "33d4bad9-f2f2-44d8-975b-8877f4f85c5b",
+          "markdown_content": "",
+          "title": "Updated Canvas",
+          "updated_at": "2025-04-24T23:17:30.113978",
+          "width": 800
         },
         files: [
           {
@@ -70,11 +87,16 @@ const initialTestData: FileManagementState = {
         id: '2',
         name: 'Project 2',
         canvasFile: {
-          id: 'canvas2',
-          name: 'Canvas 2',
-          type: 'canvas',
-          path: '/canvas2',
-          lastModified: new Date(),
+          "background_color": "#FFFFFF",
+          "created_at": "2025-04-24T23:17:30.113977",
+          "elements": [],
+          "files": [],
+          "height": 600,
+          "id": "33d4bad9-f2f2-44d8-975b-8877f4f85c5b",
+          "markdown_content": "",
+          "title": "Updated Canvas",
+          "updated_at": "2025-04-24T23:17:30.113978",
+          "width": 800
         },
         files: [
           {
@@ -168,7 +190,8 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
         const fileName = successResult.assets[0].name ?? `file_${Date.now()}`;
         const fileSize = successResult.assets[0].size ?? 0;
         const destUri = fileUri || `${state.currentFolder.id}/${fileName}`;
-
+        
+        // TODO: upload file to canvas
         const newFile: FileItem = {
             id: `${(state.currentFolder.files.length + 1).toString()}`,
             name: fileName,
@@ -229,23 +252,27 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
 
   const createCanvasFolder = async (name: string) => {
     const id = (state.folders.length + 1).toString();
-
-    const canvasFile: FileItem = {
-      id: id,
-      name: `${name} Canvas`,
-      type: "canvas",
-      path: `/${name}/canvas`,
-      lastModified: new Date(Date.now()),
+    const canvasData = {
+      title: `${name} Canvas`,
+      width: 800,
+      height: 600,
+      background_color: "#FFFFFF",
+      elements: []
     };
+
+    const canvasResponse = await canvasAPI.createCanvas(canvasData);
+    console.log(canvasResponse);
 
     const newFolder: CanvasFolder = {
       id,
       name,
-      canvasFile,
+      canvasFile: canvasResponse,
       files: [],
     };
 
     setState((prev) => ({ ...prev, folders: [...prev.folders, newFolder] }));
+    initialTestData.folders.push(newFolder);
+    console.log(initialTestData);
   };
 
   return (

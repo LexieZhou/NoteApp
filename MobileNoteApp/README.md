@@ -20,14 +20,16 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
 To connect from your iPad or other mobile devices:
 - Make sure your mobile device is connected to the same WiFi network as the server
-- Use the address `http://26.26.26.1:8080` as the base URL in your mobile app
-- API endpoints can be accessed at `http://26.26.26.1:8080/api/...`
+- Verify the actual IP address of your server
+   ```bash
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   ```
+- Use the first IP address as the base URL in your mobile app
+- API endpoints can be accessed at `http://xx.xx.xx.xx.8080/api/...`
 - Go to /MobileNoteApp/hooks/api.ts and fill in the base API configuration
    ```bash
-   const BASE_URL = 'http://26.26.26.1:8080/api';
+   const BASE_URL = 'http://xx.xx.xx.xx:8080/api';
    ```
-
-**Note:** The IP address and port `26.26.26.1:8080` may change if your network configuration changes. If you can't connect, check the current IP address shown when starting the server.
 
 3. Install dependencies
 

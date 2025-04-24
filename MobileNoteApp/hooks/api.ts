@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base API configuration
-const BASE_URL = 'http://26.26.26.1:8080/api';
+const BASE_URL = 'http://10.8.117.210:8080/api';
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -50,7 +50,7 @@ export const authAPI = {
 
 // Canvas API endpoints
 export const canvasAPI = {
-  createCanvas: async (canvasData: { title: string; content: any }) => {
+  createCanvas: async (canvasData: { title: string; width: number; height: number; background_color: string; elements: any[] }) => {
     const response = await apiClient.post('/canvas/', canvasData);
     return response.data;
   },
@@ -60,7 +60,7 @@ export const canvasAPI = {
     return response.data;
   },
   
-  updateCanvas: async (id: string, canvasData: { title?: string; content?: any }) => {
+  updateCanvas: async (id: string, canvasData:{ title: string; width: number; height: number; background_color: string; elements: any[] }) => {
     const response = await apiClient.put(`/canvas/${id}`, canvasData);
     return response.data;
   },
