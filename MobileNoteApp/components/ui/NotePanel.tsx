@@ -65,8 +65,7 @@ const NotePanel = () => {
   // ========== Drawing Strokes ==========
   const [paths, setPaths] = useState<Stroke[]>([]); // all strokes
   const [currentPath, setCurrentPath] = useState<Stroke>([]); // current stroke being drawn
-
-
+  
   const canvasRef = useRef<View>(null);
 
   const panResponder = useMemo(() => PanResponder.create({
@@ -216,7 +215,6 @@ const NotePanel = () => {
     }
   };
 
-
   return (
     <View style={styles.container}>
       <View style={styles.toolbar}>
@@ -344,7 +342,6 @@ const NotePanel = () => {
         )}
       </View>
       </View>
-      
     </View>
   );
 };
