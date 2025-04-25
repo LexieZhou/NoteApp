@@ -117,17 +117,13 @@ export const filesAPI = {
     console.log('Upload response:', response.data);
     return response.data;
   },
-  
-  getFileInfo: async (id: string) => {
-    const response = await apiClient.get(`/files/${id}`);
-    return response.data;
-  },
+
 };
 
 // QA API endpoints
 export const qaAPI = {
-  askQuestion: async (question: string, context?: { fileIds?: string[] }) => {
-    const response = await apiClient.post('/qa/ask', { question, ...context });
+  askQuestion: async (canvas_id: string, question: string, context_files?: string[]) => {
+    const response = await apiClient.post('/qa/ask', { canvas_id, question, ...context_files });
     return response.data;
   },
 };

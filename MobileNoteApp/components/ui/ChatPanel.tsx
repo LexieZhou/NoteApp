@@ -14,6 +14,8 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { qaAPI } from '../../hooks/api';
+import { useFileManagement } from '../../contexts/FileManagementContext';
 
 interface Message {
   id: number;
@@ -56,6 +58,9 @@ const ChatPanel = () => {
     {label: 'file4', value: 'file4'},
   ]);
 
+  const { state } = useFileManagement();
+  const [isLoading, setIsLoading] = useState(false);
+
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
@@ -95,7 +100,7 @@ const ChatPanel = () => {
     }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() && selectedImages.length === 0 && fileValue.length === 0) return;
 
     const userMessage: Message = {
@@ -122,6 +127,52 @@ const ChatPanel = () => {
     setInput('');
     setSelectedImages([]);
     setFileValue([]);
+    
+    if (state.currentFolder?.canvasFile?.id) {
+      setIsLoading(true);
+      try {
+        const contextFileIds = fileValue.length > 0 
+          ? fileValue.map(uri => {
+              const file = fileItems.find(item => item.value === uri);
+              return file?.label || '';
+            }).filter(id => id) 
+          : undefined;
+        
+        const response = await qaAPI.askQuestion(
+          state.currentFolder.canvasFile.id,
+          userMessage.content,
+          contextFileIds
+        );
+        
+        const aiMessage: Message = {
+          id: Date.now() + 1,
+          content: response.answer || "I couldn't generate an answer.",
+          isUser: false
+        };
+        
+        setMessages((prev) => [...prev, aiMessage]);
+      } catch (error) {
+        console.error("Error asking question:", error);
+        
+        const errorMessage: Message = {
+          id: Date.now() + 1,
+          content: "Sorry, I encountered an error while processing your question.",
+          isUser: false
+        };
+        
+        setMessages((prev) => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      const noCanvasMessage: Message = {
+        id: Date.now() + 1,
+        content: "Please open a canvas first to ask questions about it.",
+        isUser: false
+      };
+      
+      setMessages((prev) => [...prev, noCanvasMessage]);
+    }
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
@@ -153,6 +204,12 @@ const ChatPanel = () => {
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.messageList}
       />
+
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Thinking...</Text>
+        </View>
+      )}
 
       <View style={styles.footer}>
         <View style={styles.picker}>
@@ -335,6 +392,15 @@ const styles = StyleSheet.create({
       color: '#FFFFFF',
       fontSize: 16,
       fontWeight: 'bold',
+    },
+    loadingContainer: {
+      padding: 10,
+      alignItems: 'center',
+    },
+    loadingText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontStyle: 'italic',
     },
   });
 export default ChatPanel;
