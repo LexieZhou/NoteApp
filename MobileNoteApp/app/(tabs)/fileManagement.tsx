@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, FlatList, StyleSheet, Modal, TextInput } 
 import { useFileManagement } from "../../contexts/FileManagementContext";
 import { AntDesign, Feather, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import MenuBar from "../../components/ui/MenuBar";
 
 const colors = {
     bg: '#080808',
@@ -53,10 +54,16 @@ const FileManagement: React.FC = () => {
   const renderFileItem = ({ item }: any) => (
     <TouchableOpacity
       style={styles.item}
-      onPress={() => (item.type === "canvas" ? onCanvasOpen(item.uri) : {/* open with share */})}
+      onPress={() => {
+        if (item.type === "canvas" || item.title) {
+          onCanvasOpen(item.id);
+        } else {
+          {/* open with share */}
+        }
+      }}
     >
-      <Feather color={colors.fg}  name={item.type === "canvas" ? "image" : "file"} size={32} />
-      <Text style={{ color: colors.fg }} numberOfLines={1}>{item.name}</Text>
+      <Feather color={colors.fg} name={item.type === "canvas" || item.title ? "image" : "file"} size={32} />
+      <Text style={{ color: colors.fg }} numberOfLines={1}>{item.title || item.name}</Text>
       {item.type === "file" && (
         <TouchableOpacity
           style={styles.deleteBtn}
@@ -70,111 +77,116 @@ const FileManagement: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        {state.currentPath.length > 0 && (
-          <TouchableOpacity onPress={navigateUp} style={styles.backBtn}>
-            <AntDesign name="arrowleft" size={24} color={colors.fg}/>
-            <Text style={{ marginLeft: 4, color: colors.fg }}>Back</Text>
-          </TouchableOpacity>
-        )}
+      <View style={{flex: 0, height: '8%'}}>
+        <MenuBar />
       </View>
+      <View style={{flex: 1}}>
+        <View style={styles.header}>
+          {state.currentPath.length > 0 && (
+            <TouchableOpacity onPress={navigateUp} style={styles.backBtn}>
+              <AntDesign name="arrowleft" size={24} color={colors.fg}/>
+              <Text style={{ marginLeft: 4, color: colors.fg }}>Back</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-      {/* Content */}
-      {state.currentFolder ? (
-        <FlatList
-          data={[state.currentFolder.canvasFile, ...state.currentFolder.files, { id: "__add", type: "add" }]}
-          keyExtractor={(item: any) => item.id}
-          numColumns={3}
-          renderItem={({ item }: any) => {
-            if (item.id === "__add") {
-              return (
-                <TouchableOpacity style={styles.addItem} onPress={pickAndUploadFile}>
-                  <AntDesign name="plus" size={32} color={colors.fg}/>
-                </TouchableOpacity>
-              );
-            }
-            return renderFileItem({ item });
-          }}
-          contentContainerStyle={styles.list}
-        />
-      ) : (
-        <FlatList
-          data={[...state.folders, { id: "__new", type: "new" }]}
-          keyExtractor={(item: any) => item.id}
-          numColumns={3}
-          renderItem={({ item }: any) => {
-            if (item.id === "__new") {
-              return (
-                <TouchableOpacity style={styles.addItem} onPress={() => setNewFolderModal(true)}>
-                  <Feather name="folder-plus" size={32} color={colors.fg}/>
-                </TouchableOpacity>
-              );
-            }
-            return renderFolderItem({ item });
-          }}
-          contentContainerStyle={styles.list}
-        />
-      )}
+        {/* Content */}
+        {state.currentFolder ? (
+          <FlatList
+            data={[state.currentFolder.canvasFile, ...state.currentFolder.files, { id: "__add", type: "add" }]}
+            keyExtractor={(item: any) => item.id}
+            numColumns={3}
+            renderItem={({ item }: any) => {
+              if (item.id === "__add") {
+                return (
+                  <TouchableOpacity style={styles.addItem} onPress={pickAndUploadFile}>
+                    <AntDesign name="plus" size={32} color={colors.fg}/>
+                  </TouchableOpacity>
+                );
+              }
+              return renderFileItem({ item });
+            }}
+            contentContainerStyle={styles.list}
+          />
+        ) : (
+          <FlatList
+            data={[...state.folders, { id: "__new", type: "new" }]}
+            keyExtractor={(item: any) => item.id}
+            numColumns={3}
+            renderItem={({ item }: any) => {
+              if (item.id === "__new") {
+                return (
+                  <TouchableOpacity style={styles.addItem} onPress={() => setNewFolderModal(true)}>
+                    <Feather name="folder-plus" size={32} color={colors.fg}/>
+                  </TouchableOpacity>
+                );
+              }
+              return renderFolderItem({ item });
+            }}
+            contentContainerStyle={styles.list}
+          />
+        )}
 
-      {/* New Folder Modal */}
-      <Modal visible={newFolderModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>New Canvas Folder</Text>
-            <TextInput
-              placeholder="Folder name"
-              value={folderName}
-              onChangeText={setFolderName}
-              style={styles.input}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setNewFolderModal(false)} style={styles.modalButton}>
-                <Text style={{color: colors.fg}}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={async () => {
-                  if (folderName.trim()) {
-                    await createCanvasFolder(folderName.trim());
-                    setFolderName("");
-                    setNewFolderModal(false);
-                  }
-                }}
-              >
-                <Text style={{color: colors.fg}}>Create</Text>
-              </TouchableOpacity>
+        {/* New Folder Modal */}
+        <Modal visible={newFolderModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>New Canvas Folder</Text>
+              <TextInput
+                placeholder="Folder name"
+                value={folderName}
+                onChangeText={setFolderName}
+                style={styles.input}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity onPress={() => setNewFolderModal(false)} style={styles.modalButton}>
+                  <Text style={{color: colors.fg}}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={async () => {
+                    if (folderName.trim()) {
+                      await createCanvasFolder(folderName.trim());
+                      setFolderName("");
+                      setNewFolderModal(false);
+                    }
+                  }}
+                >
+                  <Text style={{color: colors.fg}}>Create</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Delete confirm modal */}
-      <Modal visible={!!deleteConfirm} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              Delete "{deleteConfirm?.name}"?
-            </Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalButton} onPress={() => setDeleteConfirm(null)}>
-                <Text style={{color: colors.fg}}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={async () => {
-                  if (deleteConfirm) {
-                    if (deleteConfirm.isFolder) await deleteFolder(deleteConfirm.id);
-                    else await deleteFile(deleteConfirm.id);
-                    setDeleteConfirm(null);
-                  }
-                }}
-              >
-                <Text style={{ color: "red" }}>Delete</Text>
-              </TouchableOpacity>
+        {/* Delete confirm modal */}
+        <Modal visible={!!deleteConfirm} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                Delete "{deleteConfirm?.name}"?
+              </Text>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalButton} onPress={() => setDeleteConfirm(null)}>
+                  <Text style={{color: colors.fg}}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={async () => {
+                    if (deleteConfirm) {
+                      if (deleteConfirm.isFolder) await deleteFolder(deleteConfirm.id);
+                      else await deleteFile(deleteConfirm.id);
+                      setDeleteConfirm(null);
+                    }
+                  }}
+                >
+                  <Text style={{ color: "red" }}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      </View>
     </View>
   );
 };

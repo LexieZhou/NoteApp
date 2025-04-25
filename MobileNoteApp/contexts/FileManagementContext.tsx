@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
-import { canvasAPI } from "../hooks/api";
+import { canvasAPI, filesAPI } from "../hooks/api";
 
 /**
  * Types
@@ -43,6 +43,7 @@ export interface FileManagementState {
 
 interface FileManagementContextType {
   state: FileManagementState;
+  setState: React.Dispatch<React.SetStateAction<FileManagementState>>;
   navigateToFolder: (folderId: string) => void;
   navigateUp: () => void;
   pickAndUploadFile: () => Promise<void>;
@@ -189,14 +190,22 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
         const fileUri = successResult.assets[0].uri;
         const fileName = successResult.assets[0].name ?? `file_${Date.now()}`;
         const fileSize = successResult.assets[0].size ?? 0;
-        const destUri = fileUri || `${state.currentFolder.id}/${fileName}`;
         
-        // TODO: upload file to canvas
+        // Upload file to server using filesAPI
+        const uploadResponse = await filesAPI.uploadFile(
+          state.currentFolder.canvasFile.id,
+          {
+            uri: fileUri,
+            name: fileName,
+            type: file.mimeType || 'application/octet-stream'
+          }
+        );
+        
         const newFile: FileItem = {
-            id: `${(state.currentFolder.files.length + 1).toString()}`,
+            id: uploadResponse.id || `${(state.currentFolder.files.length + 1).toString()}`,
             name: fileName,
             type: "file",
-            path: destUri,
+            path: uploadResponse.path || fileUri,
             size: fileSize,
             lastModified: new Date(Date.now()),
         };
@@ -279,6 +288,7 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
     <FileManagementContext.Provider
       value={{
         state,
+        setState,
         navigateToFolder,
         navigateUp,
         pickAndUploadFile,

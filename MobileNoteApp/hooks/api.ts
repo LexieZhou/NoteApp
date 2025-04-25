@@ -60,7 +60,26 @@ export const canvasAPI = {
     return response.data;
   },
   
-  updateCanvas: async (id: string, canvasData:{ title: string; width: number; height: number; background_color: string; elements: any[] }) => {
+  updateCanvas: async (id: string, canvasData: { 
+    title: string; 
+    elements: Array<{
+      id: string;
+      type: string;
+      data: {
+        points: Array<{
+          x: number;
+          y: number;
+          pressure?: number;
+          tilt?: number;
+        }>;
+        color?: string;
+        brush_size?: number;
+        brush_type?: string;
+      };
+      created_at?: string;
+      updated_at?: string;
+    }>;
+  }) => {
     const response = await apiClient.put(`/canvas/${id}`, canvasData);
     return response.data;
   },
@@ -68,7 +87,7 @@ export const canvasAPI = {
 
 // Files API endpoints
 export const filesAPI = {
-  uploadFile: async (file: { uri: string; name: string; type: string }, title: string) => {
+  uploadFile: async (canvas_id: string, file: { uri: string; name: string; type: string; }) => {
     // Create a FormData object
     const formData = new FormData();
     
@@ -76,21 +95,20 @@ export const filesAPI = {
     console.log('Uploading file:', {
       uri: file.uri,
       name: file.name,
-      type: file.type
+      type: file.type,
     });
+    console.log('Canvas ID:', canvas_id);
     
-    // Append the file to the FormData - match the format expected by the server
     formData.append('file', {
-      uri: file.uri,
-      name: file.name,
-      type: file.type
+      uri: file.uri,  // Path to your file
+      name: file.name, // Name of the file with extension
+      type: file.type, // MIME type (e.g., 'application/pdf', 'image/jpeg')
     } as any);
-    
-    // Append the title field
-    formData.append('title', title);
+    formData.append('title', file.name);
+    formData.append('canvas_id', canvas_id);
     
     // Send the request with the FormData
-    const response = await apiClient.post('/files', formData, {
+    const response = await apiClient.post('/files/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

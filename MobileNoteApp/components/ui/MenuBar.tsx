@@ -2,20 +2,101 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { canvasAPI } from "../../hooks/api";
+import { useFileManagement } from "../../contexts/FileManagementContext";
 
 export default function AppBar() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const router = useRouter();
+  const { state } = useFileManagement();
 
   const handleExitCanvas = () => {
     setShowExitDialog(true);
   };
 
-  const handleConfirmExit = (shouldSave: boolean) => {
-    if (shouldSave) {
-      // call the update canvas api
-      console.log("Saving canvas before exit");
+  const handleConfirmExit = async (shouldSave: boolean) => {
+    if (shouldSave && state.currentFolder) {
+      try {
+        // Get the current canvas data
+        const canvasId = state.currentFolder.canvasFile.id;
+        const canvasTitle = state.currentFolder.canvasFile.title;
+
+        console.log(state.currentFolder.canvasFile.elements);
+        
+        // Convert the elements to the format expected by the API
+        const elements = state.currentFolder.canvasFile.elements.map((element, index) => {
+          if (element.type === 'stroke') {
+            return {
+              id: `stroke-${index}`,
+              type: 'stroke',
+              data: {
+                points: element.data.points.map((point: { x: number; y: number; pressure?: number; tilt?: number }) => ({
+                  x: point.x,
+                  y: point.y,
+                  pressure: point.pressure || 0.5,
+                  tilt: point.tilt || 0
+                })),
+                color: element.data.color || '#000000',
+                brush_size: element.data.brush_size || 2.0,
+                brush_type: element.data.brush_type || 'pen'
+              },
+              created_at: element.created_at || new Date().toISOString(),
+              updated_at: element.updated_at || new Date().toISOString()
+            };
+          } else if (element.type === 'text') {
+            return {
+              id: `text-${index}`,
+              type: 'text',
+              data: {
+                content: element.data.content || '',
+                position: {
+                  x: element.data.position?.x || 0,
+                  y: element.data.position?.y || 0
+                },
+                font_family: element.data.font_family || 'Arial',
+                font_size: element.data.font_size || 16,
+                color: element.data.color || '#000000',
+                style: {
+                  bold: element.data.style?.bold || false,
+                  italic: element.data.style?.italic || false,
+                  underline: element.data.style?.underline || false
+                }
+              },
+              created_at: element.created_at || new Date().toISOString(),
+              updated_at: element.updated_at || new Date().toISOString()
+            };
+          } else if (element.type === 'image') {
+            return {
+              id: `image-${index}`,
+              type: 'image',
+              data: {
+                uri: element.data.uri || '',
+                position: {
+                  x: element.data.position?.x || 0,
+                  y: element.data.position?.y || 0
+                },
+                width: element.data.width || 200,
+                height: element.data.height || 200
+              },
+              created_at: element.created_at || new Date().toISOString(),
+              updated_at: element.updated_at || new Date().toISOString()
+            };
+          }
+          return element;
+        });
+        
+        // Call the API to update the canvas
+        await canvasAPI.updateCanvas(canvasId, {
+          title: canvasTitle,
+          elements: elements
+        });
+        
+        console.log("Canvas saved successfully");
+      } catch (error) {
+        console.error("Error saving canvas:", error);
+      }
     }
+    
     setShowExitDialog(false);
     router.back();
   };

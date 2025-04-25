@@ -14,6 +14,7 @@ import * as FileSystem from 'expo-file-system';
 import { Svg, Path } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useFileManagement, FileManagementState, CanvasFolder } from '../../contexts/FileManagementContext';
 
 enum TextBoxState {
   UNSELECTED = 'unselected',
@@ -55,6 +56,7 @@ function pointsToSvgPath(points: Stroke): string {
 }
 
 const NotePanel = () => {
+  const { state, setState } = useFileManagement();
   const [mode, setMode] = useState<'text' | 'draw' | 'pan'>('pan');
   // ========== Text Boxes ==========
   const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
@@ -67,6 +69,113 @@ const NotePanel = () => {
   const [currentPath, setCurrentPath] = useState<Stroke>([]); // current stroke being drawn
   
   const canvasRef = useRef<View>(null);
+
+  // Function to update canvasFile.elements
+  const updateCanvasElements = () => {
+    if (!state.currentFolder) return;
+    
+    const elements: Array<{
+      id: string;
+      type: string;
+      data: any;
+      created_at: string;
+      updated_at: string;
+    }> = [];
+    
+    // Add stroke elements
+    paths.forEach((path, index) => {
+      elements.push({
+        id: `stroke-${index}`,
+        type: 'stroke',
+        data: {
+          points: path.map(point => ({
+            x: point.x,
+            y: point.y,
+            pressure: 0.5,
+            tilt: 0
+          })),
+          color: '#000000',
+          brush_size: 2.0,
+          brush_type: 'pen'
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    });
+    
+    // Add text elements
+    textBoxes.forEach((textBox, index) => {
+      elements.push({
+        id: `text-${index}`,
+        type: 'text',
+        data: {
+          content: textBox.text,
+          position: {
+            x: textBox.x,
+            y: textBox.y
+          },
+          font_family: 'Arial',
+          font_size: textBox.fontSize,
+          color: textBox.color,
+          style: {
+            bold: textBox.isBold,
+            italic: textBox.isItalic,
+            underline: false
+          }
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    });
+    
+    // Add image elements
+    images.forEach((image, index) => {
+      elements.push({
+        id: `image-${index}`,
+        type: 'image',
+        data: {
+          uri: image.uri,
+          position: {
+            x: image.x,
+            y: image.y
+          },
+          width: image.width,
+          height: image.height
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    });
+    
+    // Update the canvasFile in the state
+    setState((prevState: FileManagementState) => {
+      if (!prevState.currentFolder) return prevState;
+      
+      const updatedFolders = prevState.folders.map((folder: CanvasFolder) => 
+        folder.id === prevState.currentFolder?.id
+          ? {
+              ...folder,
+              canvasFile: {
+                ...folder.canvasFile,
+                elements: elements
+              }
+            }
+          : folder
+      );
+      
+      return {
+        ...prevState,
+        folders: updatedFolders,
+        currentFolder: {
+          ...prevState.currentFolder,
+          canvasFile: {
+            ...prevState.currentFolder.canvasFile,
+            elements: elements
+          }
+        }
+      };
+    });
+  };
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => mode === 'draw',
@@ -84,10 +193,15 @@ const NotePanel = () => {
     },
     onPanResponderRelease: () => {
       console.log("Drawing finished");
-      setPaths((prev) => [...prev, currentPath]);
+      setPaths((prev) => {
+        const newPaths = [...prev, currentPath];
+        // Update canvas elements after paths change
+        setTimeout(updateCanvasElements, 0);
+        return newPaths;
+      });
       setCurrentPath([]);
     },
-  }), [mode, currentPath]);
+  }), [mode, currentPath, updateCanvasElements]);
 
   // Create a ref to store the initial position of the selected textbox when dragging starts.
   const selectedTextBoxInitial = useRef({ x: 0, y: 0 });
@@ -140,6 +254,8 @@ const NotePanel = () => {
       onPanResponderRelease: (evt, gestureState) => {
         // Optionally update any final state or perform cleanup.
         console.log('Textbox dragging finished');
+        // Update canvas elements after textbox movement
+        setTimeout(updateCanvasElements, 0);
       },
     })
   );
@@ -151,7 +267,12 @@ const NotePanel = () => {
   }, [textBoxes]);
 
   const handleUndo = () => {
-    setPaths((prev) => prev.slice(0, -1));
+    setPaths((prev) => {
+      const newPaths = prev.slice(0, -1);
+      // Update canvas elements after paths change
+      setTimeout(updateCanvasElements, 0);
+      return newPaths;
+    });
   };
 
   const handleCanvasPress = (e: any) => {
@@ -170,6 +291,8 @@ const NotePanel = () => {
       };
       setTextBoxes([...textBoxes, newTextBox]);
       setSelectedTextBox(newTextBox.id);
+      // Update canvas elements after textBoxes change
+      setTimeout(updateCanvasElements, 0);
     }
   };
 
@@ -205,6 +328,8 @@ const NotePanel = () => {
         uri: result.assets[0].uri,
       };
       setImages([...images, newImage]);
+      // Update canvas elements after images change
+      setTimeout(updateCanvasElements, 0);
     }
   };
 
@@ -212,6 +337,8 @@ const NotePanel = () => {
     if (selectedImage) {
       setImages(images.filter((img) => img.id !== selectedImage));
       setSelectedImage(null);
+      // Update canvas elements after images change
+      setTimeout(updateCanvasElements, 0);
     }
   };
 
