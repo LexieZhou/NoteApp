@@ -16,7 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFileManagement, FileManagementState, CanvasFolder } from '../../contexts/FileManagementContext';
 import { useLocalSearchParams } from 'expo-router';
-import { GestureHandlerRootView, PinchGestureHandler, GestureEvent } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, PinchGestureHandler, PanGestureHandler, GestureEvent } from 'react-native-gesture-handler';
 import Animated, { useAnimatedGestureHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 enum TextBoxState {
@@ -45,6 +45,7 @@ interface ImageElement {
   width: number;
   height: number;
   uri: string;
+  scale?: number;
 }
 
 // Each stroke is just an array of [x, y] points
@@ -68,6 +69,10 @@ const NotePanel = forwardRef((props, ref) => {
   // ========== Images ==========
   const [images, setImages] = useState<ImageElement[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageScales, setImageScales] = useState<{ [key: string]: number }>({});
+  const [resizingImage, setResizingImage] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [activeCorner, setActiveCorner] = useState<string | null>(null);
   // ========== Drawing Strokes ==========
   const [paths, setPaths] = useState<Stroke[]>([]); // all strokes
   const [currentPath, setCurrentPath] = useState<Stroke>([]); // current stroke being drawn
@@ -105,6 +110,33 @@ const NotePanel = forwardRef((props, ref) => {
     };
   });
 
+  const handleImagePinch = useAnimatedGestureHandler<GestureEvent<{ scale: number }>, PinchContext>({
+    onStart: (_, ctx) => {
+      if (selectedImage) {
+        ctx.startScale = imageScales[selectedImage] || 1;
+      }
+    },
+    onActive: (event, ctx) => {
+      if (selectedImage) {
+        const newScale = Math.min(Math.max(ctx.startScale * event.scale, 0.5), 3);
+        setImageScales(prev => ({
+          ...prev,
+          [selectedImage]: newScale
+        }));
+      }
+    },
+    onEnd: () => {
+      if (selectedImage) {
+        setImages(prev => prev.map(img => 
+          img.id === selectedImage 
+            ? { ...img, scale: imageScales[selectedImage] || 1 }
+            : img
+        ));
+        setTimeout(updateCanvasElements, 0);
+      }
+    },
+  });
+
   // Initialize canvas data from router params
   useEffect(() => {
     if (params.canvasData) {
@@ -136,6 +168,7 @@ const NotePanel = forwardRef((props, ref) => {
           width: el.data.width,
           height: el.data.height,
           uri: el.data.uri,
+          scale: el.data.scale,
         }));
         setImages(newImages);
 
@@ -429,8 +462,10 @@ const NotePanel = forwardRef((props, ref) => {
           width: baseWidth,
           height: calculatedHeight,
           uri: result.assets[0].uri,
+          scale: 1,
         };
         setImages([...images, newImage]);
+        setImageScales(prev => ({ ...prev, [newImage.id]: 1 }));
         // Update canvas elements after images change
         setTimeout(updateCanvasElements, 0);
       } catch (error) {
@@ -465,6 +500,110 @@ const NotePanel = forwardRef((props, ref) => {
       }, 0);
     }
   };
+
+  const handleResizeStart = (id: string, corner: string) => {
+    const image = images.find(img => img.id === id);
+    if (image) {
+      setResizingImage(id);
+      setActiveCorner(corner);
+      setResizeStart({
+        x: image.x,
+        y: image.y,
+        width: image.width,
+        height: image.height
+      });
+    }
+  };
+
+  const handleResizeMove = (gestureState: any) => {
+    if (!resizingImage || !activeCorner) return;
+
+    const image = images.find(img => img.id === resizingImage);
+    if (!image) return;
+
+    let newWidth = resizeStart.width;
+    let newHeight = resizeStart.height;
+    let newX = resizeStart.x;
+    let newY = resizeStart.y;
+
+    // Calculate new dimensions based on which corner is being dragged
+    switch (activeCorner) {
+      case 'topLeft':
+        newWidth = resizeStart.width - gestureState.translationX;
+        newHeight = resizeStart.height - gestureState.translationY;
+        newX = resizeStart.x + gestureState.translationX;
+        newY = resizeStart.y + gestureState.translationY;
+        break;
+      case 'topRight':
+        newWidth = resizeStart.width + gestureState.translationX;
+        newHeight = resizeStart.height - gestureState.translationY;
+        newY = resizeStart.y + gestureState.translationY;
+        break;
+      case 'bottomLeft':
+        newWidth = resizeStart.width - gestureState.translationX;
+        newHeight = resizeStart.height + gestureState.translationY;
+        newX = resizeStart.x + gestureState.translationX;
+        break;
+      case 'bottomRight':
+        newWidth = resizeStart.width + gestureState.translationX;
+        newHeight = resizeStart.height + gestureState.translationY;
+        break;
+    }
+
+    // Maintain aspect ratio
+    const aspectRatio = image.height / image.width;
+    if (Math.abs(gestureState.translationX) > Math.abs(gestureState.translationY)) {
+      newHeight = newWidth * aspectRatio;
+    } else {
+      newWidth = newHeight / aspectRatio;
+    }
+
+    // Update image dimensions
+    setImages(prev => prev.map(img => 
+      img.id === resizingImage 
+        ? { ...img, x: newX, y: newY, width: newWidth, height: newHeight }
+        : img
+    ));
+  };
+
+  const handleResizeEnd = () => {
+    if (resizingImage) {
+      setTimeout(updateCanvasElements, 0);
+      setResizingImage(null);
+      setActiveCorner(null);
+    }
+  };
+
+  const onPanGestureEvent = (corner: string) => {
+    return (event: GestureEvent<{ translationX: number; translationY: number }>) => {
+      if (selectedImage) {
+        handleResizeStart(selectedImage, corner);
+        handleResizeMove(event.nativeEvent);
+      }
+    };
+  };
+
+  const createCornerPanResponder = (corner: string) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (selectedImage) {
+          handleResizeStart(selectedImage, corner);
+        }
+      },
+      onPanResponderMove: (_, gestureState) => {
+        handleResizeMove(gestureState);
+      },
+      onPanResponderRelease: handleResizeEnd,
+      onPanResponderTerminate: handleResizeEnd,
+    });
+  };
+
+  const topLeftPanResponder = useMemo(() => createCornerPanResponder('topLeft'), [selectedImage, images]);
+  const topRightPanResponder = useMemo(() => createCornerPanResponder('topRight'), [selectedImage, images]);
+  const bottomLeftPanResponder = useMemo(() => createCornerPanResponder('bottomLeft'), [selectedImage, images]);
+  const bottomRightPanResponder = useMemo(() => createCornerPanResponder('bottomRight'), [selectedImage, images]);
 
   const renderCanvasContent = () => (
     <>
@@ -658,7 +797,7 @@ const NotePanel = forwardRef((props, ref) => {
 
       {/* Render images */}
       {images.map((img) => (
-        <TouchableOpacity
+        <View
           key={img.id}
           style={{
             position: 'absolute',
@@ -667,18 +806,52 @@ const NotePanel = forwardRef((props, ref) => {
             width: img.width,
             height: img.height,
           }}
-          onPress={() => handleImagePress(img.id)}
         >
-          <Image
-            source={{ uri: img.uri }}
-            style={{
-              width: img.width,
-              height: img.height,
-              borderWidth: selectedImage === img.id ? 2 : 0,
-              borderColor: 'blue',
-            }}
-          />
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleImagePress(img.id)}
+            style={{ width: '100%', height: '100%' }}
+          >
+            <Image
+              source={{ uri: img.uri }}
+              style={{
+                width: '100%',
+                height: '100%',
+                borderWidth: selectedImage === img.id ? 2 : 0,
+                borderColor: 'blue',
+              }}
+            />
+          </TouchableOpacity>
+          
+          {/* Resize handles */}
+          {selectedImage === img.id && mode === 'pan' && (
+            <>
+              <PanGestureHandler
+                onGestureEvent={onPanGestureEvent('topLeft')}
+                onEnded={handleResizeEnd}
+              >
+                <View style={[styles.resizeHandle, styles.topLeft]} />
+              </PanGestureHandler>
+              <PanGestureHandler
+                onGestureEvent={onPanGestureEvent('topRight')}
+                onEnded={handleResizeEnd}
+              >
+                <View style={[styles.resizeHandle, styles.topRight]} />
+              </PanGestureHandler>
+              <PanGestureHandler
+                onGestureEvent={onPanGestureEvent('bottomLeft')}
+                onEnded={handleResizeEnd}
+              >
+                <View style={[styles.resizeHandle, styles.bottomLeft]} />
+              </PanGestureHandler>
+              <PanGestureHandler
+                onGestureEvent={onPanGestureEvent('bottomRight')}
+                onEnded={handleResizeEnd}
+              >
+                <View style={[styles.resizeHandle, styles.bottomRight]} />
+              </PanGestureHandler>
+            </>
+          )}
+        </View>
       ))}
 
       <View style={styles.footer}>
@@ -1026,6 +1199,31 @@ const styles = StyleSheet.create({
   gridLine: {
     position: 'absolute',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  resizeHandle: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: 'blue',
+    borderRadius: 10,
+  },
+  topLeft: {
+    top: -10,
+    left: -10,
+  },
+  topRight: {
+    top: -10,
+    right: -10,
+  },
+  bottomLeft: {
+    bottom: -10,
+    left: -10,
+  },
+  bottomRight: {
+    bottom: -10,
+    right: -10,
   },
 });
 
