@@ -34,6 +34,11 @@ interface Message {
   }[];
 }
 
+interface FileItem {
+  label: string;
+  value: string;
+}
+
 const ChatPanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -50,16 +55,22 @@ const ChatPanel = () => {
 
   // file picker
   const [fileOpen, setFileOpen] = useState(false);
-  const [fileValue, setFileValue] = useState([]);
-  const [fileItems, setFileItems] = useState([
-    {label: 'file1', value: 'file1'},
-    {label: 'file2', value: 'file2'},
-    {label: 'file3', value: 'file3'},
-    {label: 'file4', value: 'file4'},
-  ]);
+  const [fileValue, setFileValue] = useState<string[]>([]);
+  const [fileItems, setFileItems] = useState<FileItem[]>([]);
 
   const { state, clearMessages } = useFileManagement();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Update file items when current folder changes
+  useEffect(() => {
+    if (state.currentFolder) {
+      const folderFiles = state.currentFolder.files.map(file => ({
+        label: file.name,
+        value: file.id
+      }));
+      setFileItems(folderFiles);
+    }
+  }, [state.currentFolder]);
 
   // Clear messages when currentFolder changes
   useEffect(() => {
@@ -89,25 +100,6 @@ const ChatPanel = () => {
     }
   };
 
-  const pickFiles = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        multiple: true,
-      });
-
-      if (result.assets) {
-        const newFiles = result.assets.map(file => ({
-          label: file.name,
-          value: file.uri
-        }));
-        setFileItems(prev => [...prev, ...newFiles]);
-      }
-    } catch (err) {
-      console.error('Error picking files:', err);
-    }
-  };
-
   const handleSend = async () => {
     if (!input.trim() && selectedImages.length === 0 && fileValue.length === 0) return;
 
@@ -120,12 +112,12 @@ const ChatPanel = () => {
         url,
         fileName: `Image-${index}`,
       })),
-      files: fileValue.map((uri, index) => {
-        const file = fileItems.find(item => item.value === uri);
+      files: fileValue.map((fileId) => {
+        const file = state.currentFolder?.files.find(f => f.id === fileId);
         return {
-          id: `${Date.now()}-${index}`,
-          name: file?.label || 'Unknown file',
-          uri: uri,
+          id: fileId,
+          name: file?.name || 'Unknown file',
+          uri: file?.path || '',
           type: 'document'
         };
       })
@@ -140,10 +132,7 @@ const ChatPanel = () => {
       setIsLoading(true);
       try {
         const contextFileIds = fileValue.length > 0 
-          ? fileValue.map(uri => {
-              const file = fileItems.find(item => item.value === uri);
-              return file?.label || '';
-            }).filter(id => id) 
+          ? fileValue 
           : undefined;
         
         const response = await qaAPI.askQuestion(
@@ -221,25 +210,39 @@ const ChatPanel = () => {
 
       <View style={styles.footer}>
         <View style={styles.picker}>
-          <DropDownPicker
-            placeholder="Select a model"
-            open={open}
-            value={value}
-            items={items}
-            setOpen={setOpen}
-            setValue={setValue}
-            setItems={setItems}
-            style={styles.dropdownStyle}
-            containerStyle={styles.dropdownContainer}
-            textStyle={styles.dropdownText}
-            dropDownContainerStyle={styles.dropdownMenu}
-          />
-          <TouchableOpacity 
-            style={styles.attachButton}
-            onPress={pickFiles}
-          >
-            <FontAwesome name="paperclip" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={styles.dropdownWrapper}>
+            <FontAwesome name="cog" size={15} color="#FFFFFF" style={styles.dropdownIcon} />
+            <DropDownPicker
+              placeholder="Select a model"
+              open={open}
+              value={value}
+              items={items}
+              setOpen={setOpen}
+              setValue={setValue}
+              setItems={setItems}
+              style={styles.dropdownStyle}
+              containerStyle={styles.dropdownContainer}
+              textStyle={styles.dropdownText}
+              dropDownContainerStyle={styles.dropdownMenu}
+            />
+          </View>
+          <View style={styles.dropdownWrapper}>
+            <FontAwesome name="file" size={15} color="#FFFFFF" style={styles.dropdownIcon} />
+            <DropDownPicker
+              placeholder="Attach files"
+              open={fileOpen}
+              value={fileValue}
+              items={fileItems}
+              setOpen={setFileOpen}
+              setValue={setFileValue}
+              setItems={setFileItems}
+              multiple={true}
+              style={styles.dropdownStyle}
+              containerStyle={styles.dropdownContainer}
+              textStyle={styles.dropdownText}
+              dropDownContainerStyle={styles.dropdownMenu}
+            />
+          </View>
         </View>
 
         <View style={styles.inputContainer}>
@@ -324,6 +327,7 @@ const styles = StyleSheet.create({
     picker: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 10,
     },
     inputContainer: {
       flexDirection: 'row',
@@ -350,10 +354,21 @@ const styles = StyleSheet.create({
       borderRadius: 20,
       marginLeft: 5,
     },
+    dropdownWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginLeft: 10,
+      marginRight: 10,
+    },
+    dropdownIcon: {
+      marginRight: 4,
+    },
     dropdownStyle: {
       backgroundColor: '#1C1C1E',
       borderColor: '#333333',
       borderRadius: 10,
+      minHeight: 40,
     },
     dropdownContainer: {
       width: 150,
