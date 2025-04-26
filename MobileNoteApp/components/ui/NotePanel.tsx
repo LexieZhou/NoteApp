@@ -16,6 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFileManagement, FileManagementState, CanvasFolder } from '../../contexts/FileManagementContext';
 import { useLocalSearchParams } from 'expo-router';
+import { GestureHandlerRootView, PinchGestureHandler, GestureEvent } from 'react-native-gesture-handler';
+import Animated, { useAnimatedGestureHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 enum TextBoxState {
   UNSELECTED = 'unselected',
@@ -75,6 +77,33 @@ const NotePanel = () => {
   const [showTextStyleControls, setShowTextStyleControls] = useState(false);
   
   const canvasRef = useRef<View>(null);
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const pinchRef = useRef(null);
+
+  type PinchContext = {
+    startScale: number;
+  };
+
+  const pinchGestureHandler = useAnimatedGestureHandler<GestureEvent<{ scale: number }>, PinchContext>({
+    onStart: (_, ctx) => {
+      ctx.startScale = scale.value;
+    },
+    onActive: (event, ctx) => {
+      // Limit the scale between 1 and 3
+      const newScale = Math.min(Math.max(ctx.startScale * event.scale, 1), 3);
+      scale.value = newScale;
+    },
+    onEnd: () => {
+      savedScale.value = scale.value;
+    },
+  });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
 
   // Initialize canvas data from router params
   useEffect(() => {
@@ -334,7 +363,7 @@ const NotePanel = () => {
         y: e.nativeEvent.locationY,
         text: '',
         fontSize: 16,
-        color: '#000000',
+        color: '#ffffff',
         isBold: false,
         isItalic: false,
         width: 200,
@@ -409,6 +438,235 @@ const NotePanel = () => {
       }, 0);
     }
   };
+
+  const renderCanvasContent = () => (
+    <>
+      {/* Add grid background */}
+      <View style={styles.gridBackground}>
+        {Array.from({ length: 50 }).map((_, i) => (
+          <View
+            key={`horizontal-${i}`}
+            style={[
+              styles.gridLine,
+              {
+                top: i * 20,
+                width: '100%',
+                height: 1,
+              },
+            ]}
+          />
+        ))}
+        {Array.from({ length: 50 }).map((_, i) => (
+          <View
+            key={`vertical-${i}`}
+            style={[
+              styles.gridLine,
+              {
+                left: i * 20,
+                height: '100%',
+                width: 1,
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <Svg style={StyleSheet.absoluteFill}>
+        {paths.map((stroke, idx) => (
+          <Path
+            key={`stroke-${idx}-${Math.random()}`}
+            d={pointsToSvgPath(stroke)}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+        ))}
+        {currentPath.length > 0 && (
+          <Path
+            d={pointsToSvgPath(currentPath)}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+        )}
+      </Svg>
+
+      {/* Render text boxes */}
+      {textBoxes.map((box) => (
+        <View
+          key={box.id}
+          style={[
+            styles.textBox,
+            {
+              position: 'absolute',
+              left: box.x,
+              top: box.y,
+              width: box.width,
+              borderColor: selectedTextBox === box.id ? '#6a99e6' : 'gray',
+              zIndex: 10,
+            },
+          ]}
+          {...(mode === 'pan' && selectedTextBox === box.id
+            ? textBoxPanResponder.current.panHandlers
+            : {})}
+        >
+          <View style={styles.textBoxHeader}>
+            <TouchableOpacity
+              onPress={() => handleTextBoxPress(box.id)}
+              style={styles.textBoxContent}
+            >
+              <TextInput
+                style={{
+                  fontSize: box.fontSize,
+                  color: box.color,
+                  fontWeight: box.isBold ? 'bold' : 'normal',
+                  fontStyle: box.isItalic ? 'italic' : 'normal',
+                }}
+                value={box.text}
+                onChangeText={(text) =>
+                  setTextBoxes((prev) =>
+                    prev.map((b) => (b.id === box.id ? { ...b, text } : b))
+                  )
+                }
+                editable={mode === 'text' && selectedTextBox === box.id}
+                pointerEvents={mode === 'text' ? 'auto' : 'none'}
+              />
+            </TouchableOpacity>
+            {selectedTextBox === box.id && (
+              <TouchableOpacity
+                onPress={() => {
+                  setShowTextStyleControls(!showTextStyleControls);
+                }}
+                style={styles.textStyleButton}
+              >
+                <FontAwesome name="cog" size={16} color="#ffffff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ))}
+
+      {/* Text Style Controls */}
+      {showTextStyleControls && selectedTextBox && (
+        <View style={[
+          styles.textStyleControls,
+          {
+            position: 'absolute',
+            left: (textBoxes.find(b => b.id === selectedTextBox)?.x || 0) + (textBoxes.find(b => b.id === selectedTextBox)?.width || 0) + 10,
+            top: textBoxes.find(b => b.id === selectedTextBox)?.y || 0,
+          }
+        ]}>
+          <View style={styles.textStyleSection}>
+            <Text style={styles.textStyleLabel}>Color:</Text>
+            <View style={styles.textColorPicker}>
+              <TouchableOpacity 
+                style={[styles.colorButton, { backgroundColor: '#ffffff' }]} 
+                onPress={() => handleTextStyleChange('color', '#ffffff')} 
+              />
+              <TouchableOpacity 
+                style={[styles.colorButton, { backgroundColor: '#ff0000' }]} 
+                onPress={() => handleTextStyleChange('color', '#ff0000')} 
+              />
+              <TouchableOpacity 
+                style={[styles.colorButton, { backgroundColor: '#00ff00' }]} 
+                onPress={() => handleTextStyleChange('color', '#00ff00')} 
+              />
+              <TouchableOpacity 
+                style={[styles.colorButton, { backgroundColor: '#0000ff' }]} 
+                onPress={() => handleTextStyleChange('color', '#0000ff')} 
+              />
+              <TouchableOpacity 
+                style={[styles.colorButton, { backgroundColor: '#ffff00' }]} 
+                onPress={() => handleTextStyleChange('color', '#ffff00')} 
+              />
+              <TouchableOpacity 
+                style={[styles.colorButton, { backgroundColor: '#ff00ff' }]} 
+                onPress={() => handleTextStyleChange('color', '#ff00ff')} 
+              />
+            </View>
+          </View>
+          <View style={styles.textStyleSection}>
+            <Text style={styles.textStyleLabel}>Size:</Text>
+            <View style={styles.textSizePicker}>
+              <TouchableOpacity 
+                style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 12 && styles.selectedTextSize]} 
+                onPress={() => handleTextStyleChange('fontSize', 12)} 
+              >
+                <Text style={styles.textSizeText}>12</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 16 && styles.selectedTextSize]} 
+                onPress={() => handleTextStyleChange('fontSize', 16)} 
+              >
+                <Text style={styles.textSizeText}>16</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 20 && styles.selectedTextSize]} 
+                onPress={() => handleTextStyleChange('fontSize', 20)} 
+              >
+                <Text style={styles.textSizeText}>20</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 24 && styles.selectedTextSize]} 
+                onPress={() => handleTextStyleChange('fontSize', 24)} 
+              >
+                <Text style={styles.textSizeText}>24</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 28 && styles.selectedTextSize]} 
+                onPress={() => handleTextStyleChange('fontSize', 28)} 
+              >
+                <Text style={styles.textSizeText}>28</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 32 && styles.selectedTextSize]} 
+                onPress={() => handleTextStyleChange('fontSize', 32)} 
+              >
+                <Text style={styles.textSizeText}>32</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Render images */}
+      {images.map((img) => (
+        <TouchableOpacity
+          key={img.id}
+          style={{
+            position: 'absolute',
+            left: img.x,
+            top: img.y,
+            width: img.width,
+            height: img.height,
+          }}
+          onPress={() => handleImagePress(img.id)}
+        >
+          <Image
+            source={{ uri: img.uri }}
+            style={{
+              width: img.width,
+              height: img.height,
+              borderWidth: selectedImage === img.id ? 2 : 0,
+              borderColor: 'blue',
+            }}
+          />
+        </TouchableOpacity>
+      ))}
+
+      <View style={styles.footer}>
+        {selectedImage ? (
+          <TouchableOpacity onPress={handleDeleteImage} style={styles.deleteImageButton}>
+            <Text style={styles.buttonText}>Delete Image</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={handleAddImage} style={styles.insertImageButton}>
+            <Text style={styles.buttonText}>Insert Image</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </>
+  );
 
   return (
     <View style={styles.container}>
@@ -514,239 +772,37 @@ const NotePanel = () => {
       {/* === Divider === */}
       <View style={{ width: 2, backgroundColor: 'gray', marginVertical: 5 }} />
 
-      <View
-        style={styles.canvas}
-        ref={canvasRef}
-        onStartShouldSetResponder={() => true}
-        onResponderRelease={handleCanvasPress}
-        {...(mode === 'draw' ? panResponder.panHandlers : {})}
-      >
-        {/* Add grid background */}
-        <View style={styles.gridBackground}>
-          {Array.from({ length: 50 }).map((_, i) => (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.canvasContainer}>
+          {mode === 'pan' ? (
+            <PinchGestureHandler
+              ref={pinchRef}
+              onGestureEvent={pinchGestureHandler}
+            >
+              <Animated.View style={[styles.canvas, animatedStyle]}>
+                <View
+                  ref={canvasRef}
+                  onStartShouldSetResponder={() => true}
+                  onResponderRelease={handleCanvasPress}
+                  style={styles.canvas}
+                >
+                  {renderCanvasContent()}
+                </View>
+              </Animated.View>
+            </PinchGestureHandler>
+          ) : (
             <View
-              key={`horizontal-${i}`}
-              style={[
-                styles.gridLine,
-                {
-                  top: i * 20,
-                  width: '100%',
-                  height: 1,
-                },
-              ]}
-            />
-          ))}
-          {Array.from({ length: 50 }).map((_, i) => (
-            <View
-              key={`vertical-${i}`}
-              style={[
-                styles.gridLine,
-                {
-                  left: i * 20,
-                  height: '100%',
-                  width: 1,
-                },
-              ]}
-            />
-          ))}
-        </View>
-
-        <Svg style={StyleSheet.absoluteFill}>
-          {paths.map((stroke, idx) => (
-            <Path
-              key={`stroke-${idx}-${Math.random()}`}
-              d={pointsToSvgPath(stroke)}
-              stroke={strokeColor}
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-          ))}
-          {currentPath.length > 0 && (
-            <Path
-              d={pointsToSvgPath(currentPath)}
-              stroke={strokeColor}
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
+              style={styles.canvas}
+              ref={canvasRef}
+              onStartShouldSetResponder={() => true}
+              onResponderRelease={handleCanvasPress}
+              {...(mode === 'draw' ? panResponder.panHandlers : {})}
+            >
+              {renderCanvasContent()}
+            </View>
           )}
-        </Svg>
-              
-
-        {/* Render text boxes */}
-        {textBoxes.map((box) => (
-          <View
-            key={box.id}
-            style={[
-              styles.textBox,
-              {
-                position: 'absolute',
-                left: box.x,
-                top: box.y,
-                width: box.width,
-                borderColor: selectedTextBox === box.id ? '#6a99e6' : 'gray',
-                zIndex: 10,
-              },
-            ]}
-            {...(mode === 'pan' && selectedTextBox === box.id
-              ? textBoxPanResponder.current.panHandlers
-              : {})}
-          >
-            <View style={styles.textBoxHeader}>
-              <TouchableOpacity
-                onPress={() => handleTextBoxPress(box.id)}
-                style={styles.textBoxContent}
-              >
-                <TextInput
-                  style={{
-                    fontSize: box.fontSize,
-                    color: box.color,
-                    fontWeight: box.isBold ? 'bold' : 'normal',
-                    fontStyle: box.isItalic ? 'italic' : 'normal',
-                  }}
-                  value={box.text}
-                  onChangeText={(text) =>
-                    setTextBoxes((prev) =>
-                      prev.map((b) => (b.id === box.id ? { ...b, text } : b))
-                    )
-                  }
-                  editable={mode === 'text' && selectedTextBox === box.id}
-                  pointerEvents={mode === 'text' ? 'auto' : 'none'}
-                />
-              </TouchableOpacity>
-              {selectedTextBox === box.id && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowTextStyleControls(!showTextStyleControls);
-                  }}
-                  style={styles.textStyleButton}
-                >
-                  <FontAwesome name="cog" size={16} color="#ffffff" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        ))}
-
-        {/* Text Style Controls */}
-        {showTextStyleControls && selectedTextBox && (
-          <View style={[
-            styles.textStyleControls,
-            {
-              position: 'absolute',
-              left: (textBoxes.find(b => b.id === selectedTextBox)?.x || 0) + (textBoxes.find(b => b.id === selectedTextBox)?.width || 0) + 10,
-              top: textBoxes.find(b => b.id === selectedTextBox)?.y || 0,
-            }
-          ]}>
-            <View style={styles.textStyleSection}>
-              <Text style={styles.textStyleLabel}>Color:</Text>
-              <View style={styles.textColorPicker}>
-                <TouchableOpacity 
-                  style={[styles.colorButton, { backgroundColor: '#ffffff' }]} 
-                  onPress={() => handleTextStyleChange('color', '#ffffff')} 
-                />
-                <TouchableOpacity 
-                  style={[styles.colorButton, { backgroundColor: '#ff0000' }]} 
-                  onPress={() => handleTextStyleChange('color', '#ff0000')} 
-                />
-                <TouchableOpacity 
-                  style={[styles.colorButton, { backgroundColor: '#00ff00' }]} 
-                  onPress={() => handleTextStyleChange('color', '#00ff00')} 
-                />
-                <TouchableOpacity 
-                  style={[styles.colorButton, { backgroundColor: '#0000ff' }]} 
-                  onPress={() => handleTextStyleChange('color', '#0000ff')} 
-                />
-                <TouchableOpacity 
-                  style={[styles.colorButton, { backgroundColor: '#ffff00' }]} 
-                  onPress={() => handleTextStyleChange('color', '#ffff00')} 
-                />
-                <TouchableOpacity 
-                  style={[styles.colorButton, { backgroundColor: '#ff00ff' }]} 
-                  onPress={() => handleTextStyleChange('color', '#ff00ff')} 
-                />
-              </View>
-            </View>
-            <View style={styles.textStyleSection}>
-              <Text style={styles.textStyleLabel}>Size:</Text>
-              <View style={styles.textSizePicker}>
-                <TouchableOpacity 
-                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 12 && styles.selectedTextSize]} 
-                  onPress={() => handleTextStyleChange('fontSize', 12)} 
-                >
-                  <Text style={styles.textSizeText}>12</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 16 && styles.selectedTextSize]} 
-                  onPress={() => handleTextStyleChange('fontSize', 16)} 
-                >
-                  <Text style={styles.textSizeText}>16</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 20 && styles.selectedTextSize]} 
-                  onPress={() => handleTextStyleChange('fontSize', 20)} 
-                >
-                  <Text style={styles.textSizeText}>20</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 24 && styles.selectedTextSize]} 
-                  onPress={() => handleTextStyleChange('fontSize', 24)} 
-                >
-                  <Text style={styles.textSizeText}>24</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 28 && styles.selectedTextSize]} 
-                  onPress={() => handleTextStyleChange('fontSize', 28)} 
-                >
-                  <Text style={styles.textSizeText}>28</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 32 && styles.selectedTextSize]} 
-                  onPress={() => handleTextStyleChange('fontSize', 32)} 
-                >
-                  <Text style={styles.textSizeText}>32</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Render images */}
-        {images.map((img) => (
-          <TouchableOpacity
-            key={img.id}
-            style={{
-              position: 'absolute',
-              left: img.x,
-              top: img.y,
-              width: img.width,
-              height: img.height,
-            }}
-            onPress={() => handleImagePress(img.id)}
-          >
-            <Image
-              source={{ uri: img.uri }}
-              style={{
-                width: img.width,
-                height: img.height,
-                borderWidth: selectedImage === img.id ? 2 : 0,
-                borderColor: 'blue',
-              }}
-            />
-          </TouchableOpacity>
-        ))}
-
-        <View style={styles.footer}>
-        {selectedImage ? (
-          <TouchableOpacity onPress={handleDeleteImage} style={styles.deleteImageButton}>
-            <Text style={styles.buttonText}>Delete Image</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={handleAddImage} style={styles.insertImageButton}>
-            <Text style={styles.buttonText}>Insert Image</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      </View>
+        </View>
+      </GestureHandlerRootView>
     </View>
   );
 };
@@ -779,13 +835,17 @@ const styles = StyleSheet.create({
     borderColor: '#757474',
     borderWidth: 1,
   },
-  canvas: {
-    position: 'relative',
+  canvasContainer: {
     flex: 1,
     marginLeft: 5,
     marginRight: 5,
     backgroundColor: '#17171a',
     overflow: 'hidden',
+  },
+  canvas: {
+    position: 'relative',
+    flex: 1,
+    backgroundColor: '#17171a',
   },
   textBox: {
     position: 'absolute',
