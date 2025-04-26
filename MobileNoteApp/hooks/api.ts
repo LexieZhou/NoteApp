@@ -79,6 +79,7 @@ export const canvasAPI = {
       created_at?: string;
       updated_at?: string;
     }>;
+    image?: string;
   }) => {
     const response = await apiClient.put(`/canvas/${id}`, canvasData);
     return response.data;

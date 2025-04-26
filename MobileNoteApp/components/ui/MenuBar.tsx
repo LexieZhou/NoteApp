@@ -1,11 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { canvasAPI } from "../../hooks/api";
 import { useFileManagement } from "../../contexts/FileManagementContext";
+import { captureRef } from 'react-native-view-shot';
+import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 
-export default function AppBar() {
+interface MenuBarProps {
+  notePanelRef: React.RefObject<any>;
+}
+
+export default function AppBar({ notePanelRef }: MenuBarProps) {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const router = useRouter();
   const { state, setState } = useFileManagement();
@@ -47,13 +54,53 @@ export default function AppBar() {
         const canvasId = state.currentFolder.canvasFile.id;
         const canvasTitle = state.currentFolder.canvasFile.title;
 
-        // console.log("Current canvas elements:", state.currentFolder.canvasFile.elements);
+        // Capture screenshot of the canvas
+        let screenshotUri: string | null = null;
+        let base64Image: string | undefined = undefined;
+        try {
+          const canvasRef = notePanelRef.current?.getCanvasRef();
+          if (canvasRef) {
+            // First capture as PNG (to preserve quality)
+            screenshotUri = await captureRef(canvasRef, {
+              height: state.currentFolder.canvasFile.height,
+              width: state.currentFolder.canvasFile.width,
+              quality: 1,
+              format: 'png',
+              result: 'tmpfile'
+            });
+            
+            if (screenshotUri) {
+              // Convert RGBA to RGB using ImageManipulator
+              const manipulatedImage = await ImageManipulator.manipulateAsync(
+                screenshotUri,
+                [{ resize: { width: state.currentFolder.canvasFile.width, height: state.currentFolder.canvasFile.height } }],
+                { format: ImageManipulator.SaveFormat.JPEG, compress: 1 }
+              );
+
+              // Read the JPEG file and convert to base64
+              const base64 = await FileSystem.readAsStringAsync(manipulatedImage.uri, {
+                encoding: FileSystem.EncodingType.Base64
+              });
+              base64Image = `data:image/jpeg;base64,${base64}`;
+              
+              // Clean up the temporary files
+              try {
+                await FileSystem.deleteAsync(screenshotUri);
+                await FileSystem.deleteAsync(manipulatedImage.uri);
+              } catch (e) {
+                console.warn('Failed to delete temporary screenshot files:', e);
+              }
+              
+              console.log("Base64 image generated:", base64Image.substring(0, 100) + "..."); // Log first 100 chars
+            }
+          }
+        } catch (error) {
+          console.error("Error capturing screenshot:", error);
+        }
         
         // Convert the elements to the format expected by the API
         const elements = state.currentFolder.canvasFile.elements.map((element, index) => {
-          // console.log("Processing element:", element);
           if (element.type === 'stroke') {
-            // console.log("Processing stroke element:", element);
             const processedStroke = {
               id: `stroke-${index}`,
               type: 'stroke',
@@ -71,7 +118,6 @@ export default function AppBar() {
               created_at: element.created_at || new Date().toISOString(),
               updated_at: element.updated_at || new Date().toISOString()
             };
-            // console.log("Processed stroke:", processedStroke);
             return processedStroke;
           } else if (element.type === 'text') {
             return {
@@ -115,11 +161,21 @@ export default function AppBar() {
           return element;
         });
         
-        // Call the API to update the canvas
-        await canvasAPI.updateCanvas(canvasId, {
+        // Prepare the canvas data
+        const canvasData = {
           title: canvasTitle,
-          elements: elements
+          elements: elements,
+          image: base64Image
+        };
+        
+        console.log("Sending canvas data:", {
+          title: canvasData.title,
+          elementsCount: canvasData.elements.length,
+          hasImage: !!canvasData.image
         });
+        
+        // Call the API to update the canvas
+        await canvasAPI.updateCanvas(canvasId, canvasData);
         
         console.log("Canvas saved successfully");
       } catch (error) {

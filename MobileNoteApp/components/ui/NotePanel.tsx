@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -58,7 +58,7 @@ function pointsToSvgPath(points: Stroke): string {
   return d.join(' ');
 }
 
-const NotePanel = () => {
+const NotePanel = forwardRef((props, ref) => {
   const { state, setState, loadCanvasData } = useFileManagement();
   const params = useLocalSearchParams();
   const [mode, setMode] = useState<'text' | 'draw' | 'pan'>('pan');
@@ -695,6 +695,11 @@ const NotePanel = () => {
     </>
   );
 
+  // Expose the canvasRef to the parent component
+  React.useImperativeHandle(ref, () => ({
+    getCanvasRef: () => canvasRef.current
+  }));
+
   return (
     <View style={styles.container}>
       <View style={styles.toolbar}>
@@ -832,7 +837,7 @@ const NotePanel = () => {
       </GestureHandlerRootView>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
