@@ -521,6 +521,36 @@ const NotePanel = () => {
         onResponderRelease={handleCanvasPress}
         {...(mode === 'draw' ? panResponder.panHandlers : {})}
       >
+        {/* Add grid background */}
+        <View style={styles.gridBackground}>
+          {Array.from({ length: 50 }).map((_, i) => (
+            <View
+              key={`horizontal-${i}`}
+              style={[
+                styles.gridLine,
+                {
+                  top: i * 20,
+                  width: '100%',
+                  height: 1,
+                },
+              ]}
+            />
+          ))}
+          {Array.from({ length: 50 }).map((_, i) => (
+            <View
+              key={`vertical-${i}`}
+              style={[
+                styles.gridLine,
+                {
+                  left: i * 20,
+                  height: '100%',
+                  width: 1,
+                },
+              ]}
+            />
+          ))}
+        </View>
+
         <Svg style={StyleSheet.absoluteFill}>
           {paths.map((stroke, idx) => (
             <Path
@@ -755,6 +785,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     marginRight: 5,
     backgroundColor: '#17171a',
+    overflow: 'hidden',
   },
   textBox: {
     position: 'absolute',
@@ -891,6 +922,18 @@ const styles = StyleSheet.create({
   textSizeText: {
     color: '#ffffff',
     fontSize: 11,
+  },
+  gridBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  gridLine: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
 });
 
