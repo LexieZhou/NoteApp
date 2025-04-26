@@ -73,6 +73,9 @@ const NotePanel = forwardRef((props, ref) => {
   const [resizingImage, setResizingImage] = useState<string | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [activeCorner, setActiveCorner] = useState<string | null>(null);
+  // Add state for image dragging
+  const [imageDragStart, setImageDragStart] = useState({ x: 0, y: 0 });
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
   // ========== Drawing Strokes ==========
   const [paths, setPaths] = useState<Stroke[]>([]); // all strokes
   const [currentPath, setCurrentPath] = useState<Stroke>([]); // current stroke being drawn
@@ -407,6 +410,10 @@ const NotePanel = forwardRef((props, ref) => {
       // Update canvas elements after textBoxes change
       setTimeout(updateCanvasElements, 0);
     }
+    if (mode === 'pan') {
+      setSelectedImage(null);
+      setSelectedTextBox(null);
+    }
   };
 
   const handleTextBoxPress = (id: string) => {
@@ -604,6 +611,42 @@ const NotePanel = forwardRef((props, ref) => {
   const topRightPanResponder = useMemo(() => createCornerPanResponder('topRight'), [selectedImage, images]);
   const bottomLeftPanResponder = useMemo(() => createCornerPanResponder('bottomLeft'), [selectedImage, images]);
   const bottomRightPanResponder = useMemo(() => createCornerPanResponder('bottomRight'), [selectedImage, images]);
+
+  // Add image pan responder
+  const imagePanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (evt) => {
+      if (selectedImage) {
+        const image = images.find(img => img.id === selectedImage);
+        if (image) {
+          setImageDragStart({ x: image.x, y: image.y });
+          setIsDraggingImage(true);
+        }
+      }
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      if (selectedImage && isDraggingImage) {
+        // Simple direct movement without any scaling or complex calculations
+        const newX = imageDragStart.x + gestureState.dx;
+        const newY = imageDragStart.y + gestureState.dy;
+        
+        setImages(prevImages => prevImages.map(img =>
+          img.id === selectedImage
+            ? { ...img, x: newX, y: newY }
+            : img
+        ));
+      }
+    },
+    onPanResponderRelease: () => {
+      setIsDraggingImage(false);
+      setTimeout(updateCanvasElements, 0);
+    },
+    onPanResponderTerminate: () => {
+      setIsDraggingImage(false);
+      setTimeout(updateCanvasElements, 0);
+    },
+  }), [mode, selectedImage, images, imageDragStart, isDraggingImage]);
 
   const renderCanvasContent = () => (
     <>
@@ -805,11 +848,18 @@ const NotePanel = forwardRef((props, ref) => {
             top: img.y,
             width: img.width,
             height: img.height,
+            zIndex: 10,
           }}
+          {...(mode === 'pan' && selectedImage === img.id ? imagePanResponder.panHandlers : {})}
         >
           <TouchableOpacity
             onPress={() => handleImagePress(img.id)}
-            style={{ width: '100%', height: '100%' }}
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              backgroundColor: 'transparent', // Make the touch area transparent
+            }}
+            activeOpacity={1} // Prevent opacity change on press
           >
             <Image
               source={{ uri: img.uri }}
@@ -1046,11 +1096,14 @@ const styles = StyleSheet.create({
     marginRight: 5,
     backgroundColor: '#17171a',
     overflow: 'hidden',
+    position: 'relative',
   },
   canvas: {
     position: 'relative',
     flex: 1,
     backgroundColor: '#17171a',
+    width: '100%',
+    height: '100%',
   },
   textBox: {
     position: 'absolute',
@@ -1067,7 +1120,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 10,
-    // backgroundColor: '#2e2b2b',
+    zIndex: 1000,
+    backgroundColor: 'rgba(23, 23, 26, 0.8)',
+    borderRadius: 5,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   insertImageButton: {
     backgroundColor: '#007bff',
