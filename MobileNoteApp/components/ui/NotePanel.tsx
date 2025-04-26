@@ -391,6 +391,21 @@ const NotePanel = () => {
     }
   };
 
+  const getImageDimensions = async (uri: string) => {
+    return new Promise<{ width: number; height: number }>((resolve, reject) => {
+      Image.getSize(
+        uri,
+        (width, height) => {
+          resolve({ width, height });
+        },
+        (error) => {
+          console.error('Error getting image dimensions:', error);
+          reject(error);
+        }
+      );
+    });
+  };
+
   const handleAddImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -399,17 +414,29 @@ const NotePanel = () => {
     });
 
     if (!result.canceled) {
-      const newImage: ImageElement = {
-        id: Date.now().toString(),
-        x: 50,
-        y: 50,
-        width: 200,
-        height: 200,
-        uri: result.assets[0].uri,
-      };
-      setImages([...images, newImage]);
-      // Update canvas elements after images change
-      setTimeout(updateCanvasElements, 0);
+      try {
+        const { width: originalWidth, height: originalHeight } = await getImageDimensions(result.assets[0].uri);
+        
+        // Set a base width and calculate height to maintain aspect ratio
+        const baseWidth = 200;
+        const aspectRatio = originalHeight / originalWidth;
+        const calculatedHeight = baseWidth * aspectRatio;
+
+        const newImage: ImageElement = {
+          id: Date.now().toString(),
+          x: 50,
+          y: 50,
+          width: baseWidth,
+          height: calculatedHeight,
+          uri: result.assets[0].uri,
+        };
+        setImages([...images, newImage]);
+        // Update canvas elements after images change
+        setTimeout(updateCanvasElements, 0);
+      } catch (error) {
+        console.error('Error processing image:', error);
+        Alert.alert('Error', 'Failed to process the selected image');
+      }
     }
   };
 
