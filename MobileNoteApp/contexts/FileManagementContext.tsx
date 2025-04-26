@@ -50,6 +50,8 @@ interface FileManagementContextType {
   deleteFile: (fileId: string) => void;
   deleteFolder: (folderId: string) => void;
   createCanvasFolder: (name: string) => Promise<void>;
+  clearMessages: () => void;
+  loadCanvasData: (canvasId: string) => Promise<CanvaItem>;
 }
 
 const STORAGE_KEY = "@file_management_state_v1";
@@ -153,9 +155,35 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
     }
   };
 
-  const navigateToFolder = (folderId: string) => {
+  const loadCanvasData = async (canvasId: string): Promise<CanvaItem> => {
+    try {
+      const canvasData = await canvasAPI.getCanvas(canvasId);
+      setState((prev) => {
+        const updatedFolders = prev.folders.map((folder) =>
+          folder.canvasFile.id === canvasId
+            ? { ...folder, canvasFile: canvasData }
+            : folder
+        );
+        return {
+          ...prev,
+          folders: updatedFolders,
+          currentFolder: prev.currentFolder?.canvasFile.id === canvasId
+            ? { ...prev.currentFolder, canvasFile: canvasData }
+            : prev.currentFolder,
+        };
+      });
+      return canvasData;
+    } catch (error) {
+      console.error("Error loading canvas data:", error);
+      throw error;
+    }
+  };
+
+  const navigateToFolder = async (folderId: string) => {
     const folder = state.folders.find((f) => f.id === folderId);
     if (folder) {
+      // Load canvas data when navigating to a folder
+      await loadCanvasData(folder.canvasFile.id);
       setState((prev) => ({
         ...prev,
         currentPath: [...prev.currentPath, folderId],
@@ -284,6 +312,19 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
     console.log(initialTestData);
   };
 
+  const clearMessages = () => {
+    setState((prev) => ({
+      ...prev,
+      currentFolder: prev.currentFolder ? {
+        ...prev.currentFolder,
+        canvasFile: {
+          ...prev.currentFolder.canvasFile,
+          elements: []
+        }
+      } : undefined
+    }));
+  };
+
   return (
     <FileManagementContext.Provider
       value={{
@@ -295,6 +336,8 @@ export const FileManagementProvider: React.FC<{ children: React.ReactNode }> = (
         deleteFile,
         deleteFolder,
         createCanvasFolder,
+        clearMessages,
+        loadCanvasData,
       }}
     >
       {children}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Modal, TextInput } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Modal, TextInput, ActivityIndicator } from "react-native";
 import { useFileManagement } from "../../contexts/FileManagementContext";
 import { AntDesign, Feather, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -21,19 +21,35 @@ const FileManagement: React.FC = () => {
     deleteFile,
     deleteFolder,
     createCanvasFolder,
+    loadCanvasData,
   } = useFileManagement();
 
   const [newFolderModal, setNewFolderModal] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string; isFolder: boolean } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // change tab
   const router = useRouter();
-  const onCanvasOpen = (projectID: string) => {
-    router.push({
+  const onCanvasOpen = async (canvasID: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const canvasData = await loadCanvasData(canvasID);
+      router.push({
         pathname: "/(tabs)",
-        params: { projectID },
-    });
+        params: { 
+          canvasID,
+          canvasData: JSON.stringify(canvasData)
+        },
+      });
+    } catch (err) {
+      setError('Failed to load canvas data');
+      console.error('Error loading canvas:', err);
+    } finally {
+      setIsLoading(false);
     }
+  }
 
   const renderFolderItem = ({ item }: any) => (
     <TouchableOpacity
@@ -81,6 +97,16 @@ const FileManagement: React.FC = () => {
         <MenuBar />
       </View>
       <View style={{flex: 1}}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        )}
         <View style={styles.header}>
           {state.currentPath.length > 0 && (
             <TouchableOpacity onPress={navigateUp} style={styles.backBtn}>
@@ -266,5 +292,27 @@ const styles = StyleSheet.create({
     },
   
     modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+  
+    errorContainer: {
+      padding: 16,
+      backgroundColor: 'rgba(255, 0, 0, 0.1)',
+      margin: 8,
+      borderRadius: 8,
+    },
+    errorText: {
+      color: 'red',
+      textAlign: 'center',
+    },
+    loadingContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      zIndex: 1000,
+    },
   });
   

@@ -8,10 +8,36 @@ import { useFileManagement } from "../../contexts/FileManagementContext";
 export default function AppBar() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const router = useRouter();
-  const { state } = useFileManagement();
+  const { state, setState } = useFileManagement();
 
   const handleExitCanvas = () => {
     setShowExitDialog(true);
+  };
+
+  const clearCurrentCanvas = () => {
+    if (state.currentFolder) {
+      setState((prev) => ({
+        ...prev,
+        folders: prev.folders.map(folder => 
+          folder.id === state.currentFolder?.id
+            ? { 
+                ...folder, 
+                canvasFile: {
+                  ...folder.canvasFile,
+                  elements: []
+                }
+              }
+            : folder
+        ),
+        currentFolder: state.currentFolder ? {
+          ...state.currentFolder,
+          canvasFile: {
+            ...state.currentFolder.canvasFile,
+            elements: []
+          }
+        } : undefined
+      }));
+    }
   };
 
   const handleConfirmExit = async (shouldSave: boolean) => {
@@ -21,12 +47,14 @@ export default function AppBar() {
         const canvasId = state.currentFolder.canvasFile.id;
         const canvasTitle = state.currentFolder.canvasFile.title;
 
-        console.log(state.currentFolder.canvasFile.elements);
+        // console.log("Current canvas elements:", state.currentFolder.canvasFile.elements);
         
         // Convert the elements to the format expected by the API
         const elements = state.currentFolder.canvasFile.elements.map((element, index) => {
+          // console.log("Processing element:", element);
           if (element.type === 'stroke') {
-            return {
+            // console.log("Processing stroke element:", element);
+            const processedStroke = {
               id: `stroke-${index}`,
               type: 'stroke',
               data: {
@@ -43,6 +71,8 @@ export default function AppBar() {
               created_at: element.created_at || new Date().toISOString(),
               updated_at: element.updated_at || new Date().toISOString()
             };
+            // console.log("Processed stroke:", processedStroke);
+            return processedStroke;
           } else if (element.type === 'text') {
             return {
               id: `text-${index}`,
@@ -95,6 +125,8 @@ export default function AppBar() {
       } catch (error) {
         console.error("Error saving canvas:", error);
       }
+    } else {
+      clearCurrentCanvas();
     }
     
     setShowExitDialog(false);

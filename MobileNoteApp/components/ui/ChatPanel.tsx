@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -58,8 +58,16 @@ const ChatPanel = () => {
     {label: 'file4', value: 'file4'},
   ]);
 
-  const { state } = useFileManagement();
+  const { state, clearMessages } = useFileManagement();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Clear messages when currentFolder changes
+  useEffect(() => {
+    setMessages([]);
+    setInput('');
+    setSelectedImages([]);
+    setFileValue([]);
+  }, [state.currentFolder]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();

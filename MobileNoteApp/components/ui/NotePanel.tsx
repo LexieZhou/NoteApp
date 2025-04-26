@@ -15,6 +15,7 @@ import { Svg, Path } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFileManagement, FileManagementState, CanvasFolder } from '../../contexts/FileManagementContext';
+import { useLocalSearchParams } from 'expo-router';
 
 enum TextBoxState {
   UNSELECTED = 'unselected',
@@ -56,7 +57,8 @@ function pointsToSvgPath(points: Stroke): string {
 }
 
 const NotePanel = () => {
-  const { state, setState } = useFileManagement();
+  const { state, setState, loadCanvasData } = useFileManagement();
+  const params = useLocalSearchParams();
   const [mode, setMode] = useState<'text' | 'draw' | 'pan'>('pan');
   // ========== Text Boxes ==========
   const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
@@ -67,8 +69,64 @@ const NotePanel = () => {
   // ========== Drawing Strokes ==========
   const [paths, setPaths] = useState<Stroke[]>([]); // all strokes
   const [currentPath, setCurrentPath] = useState<Stroke>([]); // current stroke being drawn
+  const [strokeColor, setStrokeColor] = useState('#ffffff');
+  const [strokeWidth, setStrokeWidth] = useState(3);
+  const [brushType, setBrushType] = useState('pen');
   
   const canvasRef = useRef<View>(null);
+
+  // Initialize canvas data from router params
+  useEffect(() => {
+    if (params.canvasData) {
+      try {
+        const canvasData = JSON.parse(params.canvasData as string);
+        
+        // Initialize text boxes
+        const textElements = canvasData.elements.filter((el: any) => el.type === 'text');
+        const newTextBoxes = textElements.map((el: any) => ({
+          id: el.id,
+          x: el.data.position.x,
+          y: el.data.position.y,
+          text: el.data.content,
+          fontSize: el.data.font_size,
+          color: el.data.color,
+          isBold: el.data.style.bold,
+          isItalic: el.data.style.italic,
+          width: 200,
+          state: TextBoxState.UNSELECTED,
+        }));
+        setTextBoxes(newTextBoxes);
+
+        // Initialize images
+        const imageElements = canvasData.elements.filter((el: any) => el.type === 'image');
+        const newImages = imageElements.map((el: any) => ({
+          id: el.id,
+          x: el.data.position.x,
+          y: el.data.position.y,
+          width: el.data.width,
+          height: el.data.height,
+          uri: el.data.uri,
+        }));
+        setImages(newImages);
+
+        // Initialize paths and stroke properties
+        const strokeElements = canvasData.elements.filter((el: any) => el.type === 'stroke');
+        if (strokeElements.length > 0) {
+          // Use the properties from the first stroke element
+          const firstStroke = strokeElements[0];
+          setStrokeColor(firstStroke.data.color || '#ffffff');
+          setStrokeWidth(firstStroke.data.brush_size || 3);
+          setBrushType(firstStroke.data.brush_type || 'pen');
+        }
+        const newPaths = strokeElements.map((el: any) => 
+          el.data.points.map((point: any) => ({ x: point.x, y: point.y }))
+        );
+        setPaths(newPaths);
+      } catch (error) {
+        console.error('Error parsing canvas data:', error);
+      }
+    }
+  }, [params.canvasData]);
 
   // Function to update canvasFile.elements
   const updateCanvasElements = () => {
@@ -94,9 +152,9 @@ const NotePanel = () => {
             pressure: 0.5,
             tilt: 0
           })),
-          color: '#000000',
-          brush_size: 2.0,
-          brush_type: 'pen'
+          color: strokeColor,
+          brush_size: strokeWidth,
+          brush_type: brushType
         },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -262,10 +320,6 @@ const NotePanel = () => {
 
   // console.log('textBoxPanResponder:', textBoxPanResponder.current);
 
-  useEffect(() => {
-    console.log('Rendering with textBoxes:', textBoxes);
-  }, [textBoxes]);
-
   const handleUndo = () => {
     setPaths((prev) => {
       const newPaths = prev.slice(0, -1);
@@ -345,6 +399,7 @@ const NotePanel = () => {
   return (
     <View style={styles.container}>
       <View style={styles.toolbar}>
+        <View style={styles.modeButtons}>
           <FontAwesome.Button name="hand-grab-o" size={18} backgroundColor={mode === 'pan' ? 'gray' : 'black'} onPress={() => setMode('pan')} style={styles.button} >
             Pan Mode
           </FontAwesome.Button>
@@ -354,9 +409,92 @@ const NotePanel = () => {
           <FontAwesome.Button name="paint-brush" size={18} backgroundColor={mode === 'draw' ? 'gray' : 'black'} onPress={() => setMode('draw')} style={styles.button}>
             Draw Mode
           </FontAwesome.Button>
-          <FontAwesome.Button name="undo" size={18} backgroundColor={'black'} onPress={handleUndo} style={styles.button}>
-            Undo
-          </FontAwesome.Button>
+        </View>
+        <View style={styles.toolControls}>
+          <View style={styles.colorPicker}>
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#ffffff' }]} 
+              onPress={() => setStrokeColor('#ffffff')} 
+            />
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#ff0000' }]} 
+              onPress={() => setStrokeColor('#ff0000')} 
+            />
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#00ff00' }]} 
+              onPress={() => setStrokeColor('#00ff00')} 
+            />
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#0000ff' }]} 
+              onPress={() => setStrokeColor('#0000ff')} 
+            />
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#ffff00' }]} 
+              onPress={() => setStrokeColor('#ffff00')} 
+            />
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#ff00ff' }]} 
+              onPress={() => setStrokeColor('#ff00ff')} 
+            />
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#00ffff' }]} 
+              onPress={() => setStrokeColor('#00ffff')} 
+            />
+            <TouchableOpacity 
+              style={[styles.colorButton, { backgroundColor: '#ffa500' }]} 
+              onPress={() => setStrokeColor('#ffa500')} 
+            />
+          </View>
+          <View style={styles.brushSizePicker}>
+            <TouchableOpacity 
+              style={[styles.brushSizeButton, strokeWidth === 1 && styles.selectedBrushSize]} 
+              onPress={() => setStrokeWidth(1)} 
+            >
+              <Text style={styles.brushSizeText}>1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.brushSizeButton, strokeWidth === 2 && styles.selectedBrushSize]} 
+              onPress={() => setStrokeWidth(2)} 
+            >
+              <Text style={styles.brushSizeText}>2</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.brushSizeButton, strokeWidth === 3 && styles.selectedBrushSize]} 
+              onPress={() => setStrokeWidth(3)} 
+            >
+              <Text style={styles.brushSizeText}>3</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.brushSizeButton, strokeWidth === 4 && styles.selectedBrushSize]} 
+              onPress={() => setStrokeWidth(4)} 
+            >
+              <Text style={styles.brushSizeText}>4</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.brushSizeButton, strokeWidth === 5 && styles.selectedBrushSize]} 
+              onPress={() => setStrokeWidth(5)} 
+            >
+              <Text style={styles.brushSizeText}>5</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.brushSizeButton, strokeWidth === 8 && styles.selectedBrushSize]} 
+              onPress={() => setStrokeWidth(8)} 
+            >
+              <Text style={styles.brushSizeText}>8</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.undoContainer}>
+            <FontAwesome.Button 
+              name="undo" 
+              size={16} 
+              backgroundColor={'black'} 
+              onPress={handleUndo} 
+              style={styles.undoButton}
+            >
+              Undo
+            </FontAwesome.Button>
+          </View>
+        </View>
       </View>
 
       {/* === Divider === */}
@@ -374,17 +512,17 @@ const NotePanel = () => {
             <Path
               key={`stroke-${idx}-${Math.random()}`}
               d={pointsToSvgPath(stroke)}
-              stroke="white"
-              strokeWidth={3}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
               fill="none"
             />
           ))}
-          {/* Optionally, render the currentPath being drawn */}
           {currentPath.length > 0 && (
             <Path
               d={pointsToSvgPath(currentPath)}
-              stroke="white"
-              strokeWidth={3}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              fill="none"
             />
           )}
         </Svg>
@@ -415,7 +553,7 @@ const NotePanel = () => {
               <TextInput
                 style={{
                   fontSize: box.fontSize,
-                  color: box.color,
+                  color: 'white',
                   fontWeight: box.isBold ? 'bold' : 'normal',
                   fontStyle: box.isItalic ? 'italic' : 'normal',
                 }}
@@ -479,11 +617,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#080808',
   },
   toolbar: {
+    flexDirection: 'column',
+    padding: 10,
+    backgroundColor: '#0a0a0a',
+  },
+  modeButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
     gap: 5,
-    padding: 10,
-    backgroundColor: '#0a0a0a',
+    marginBottom: 10,
+  },
+  toolControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
   },
   button: {
     padding: 10,
@@ -528,7 +676,48 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-  }
+  },
+  colorPicker: {
+    flexDirection: 'row',
+    gap: 5,
+    flexWrap: 'wrap',
+    maxWidth: '60%',
+  },
+  colorButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#757474',
+  },
+  brushSizePicker: {
+    flexDirection: 'row',
+    gap: 5,
+    flexWrap: 'wrap',
+    maxWidth: '30%',
+  },
+  brushSizeButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#757474',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedBrushSize: {
+    backgroundColor: '#757474',
+  },
+  brushSizeText: {
+    color: '#ffffff',
+    fontSize: 12,
+  },
+  undoContainer: {
+    marginLeft: 'auto',
+  },
+  undoButton: {
+    padding: 8,
+  },
 });
 
 export default NotePanel;
