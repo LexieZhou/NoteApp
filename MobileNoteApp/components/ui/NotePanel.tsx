@@ -72,6 +72,7 @@ const NotePanel = () => {
   const [strokeColor, setStrokeColor] = useState('#ffffff');
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [brushType, setBrushType] = useState('pen');
+  const [showTextStyleControls, setShowTextStyleControls] = useState(false);
   
   const canvasRef = useRef<View>(null);
 
@@ -278,16 +279,12 @@ const NotePanel = () => {
       onMoveShouldSetPanResponder: () => mode === 'pan',
       onPanResponderGrant: (evt, gestureState) => {
         const boxId = selectedTextBox;
-        console.log('Pan started for textbox:', boxId);
-        console.log('All textbox IDs:', textBoxes.map(b => b.id));
-        
         const currentBox = textBoxes.find(b => b.id === boxId);
         if (currentBox) {
           selectedTextBoxInitial.current = { 
             x: currentBox.x || 0, 
             y: currentBox.y || 0 
           };
-          console.log('Initial position:', selectedTextBoxInitial.current);
         } else {
           console.error('Could not find textbox with ID:', boxId);
           console.error('TextBoxes array:', JSON.stringify(textBoxes));
@@ -311,7 +308,7 @@ const NotePanel = () => {
       },
       onPanResponderRelease: (evt, gestureState) => {
         // Optionally update any final state or perform cleanup.
-        console.log('Textbox dragging finished');
+        // console.log('Textbox dragging finished');
         // Update canvas elements after textbox movement
         setTimeout(updateCanvasElements, 0);
       },
@@ -351,7 +348,7 @@ const NotePanel = () => {
   };
 
   const handleTextBoxPress = (id: string) => {
-    console.log('TextBox pressed:', id);
+    // console.log('TextBox pressed:', id);
     setSelectedTextBox(id);
   };
   const handleStyleChange = (event: React.MouseEvent<HTMLElement>, id: string) => {
@@ -393,6 +390,23 @@ const NotePanel = () => {
       setSelectedImage(null);
       // Update canvas elements after images change
       setTimeout(updateCanvasElements, 0);
+    }
+  };
+
+  const handleTextStyleChange = (property: string, value: any) => {
+    if (selectedTextBox) {
+      setTextBoxes(prev => {
+        const updated = prev.map(box => 
+          box.id === selectedTextBox 
+            ? { ...box, [property]: value }
+            : box
+        );
+        return updated;
+      });
+      // Update canvas elements after text style change
+      setTimeout(() => {
+        updateCanvasElements();
+      }, 0);
     }
   };
 
@@ -529,7 +543,7 @@ const NotePanel = () => {
               
 
         {/* Render text boxes */}
-        { textBoxes.map((box) => (
+        {textBoxes.map((box) => (
           <View
             key={box.id}
             style={[
@@ -547,28 +561,124 @@ const NotePanel = () => {
               ? textBoxPanResponder.current.panHandlers
               : {})}
           >
-            <TouchableOpacity
-              onPress={() => handleTextBoxPress(box.id)}
-            >
-              <TextInput
-                style={{
-                  fontSize: box.fontSize,
-                  color: 'white',
-                  fontWeight: box.isBold ? 'bold' : 'normal',
-                  fontStyle: box.isItalic ? 'italic' : 'normal',
-                }}
-                value={box.text}
-                onChangeText={(text) =>
-                  setTextBoxes((prev) =>
-                    prev.map((b) => (b.id === box.id ? { ...b, text } : b))
-                  )
-                }
-                editable={mode === 'text' && selectedTextBox === box.id}
-                pointerEvents={mode === 'text' ? 'auto' : 'none'}
-              />
-            </TouchableOpacity>
+            <View style={styles.textBoxHeader}>
+              <TouchableOpacity
+                onPress={() => handleTextBoxPress(box.id)}
+                style={styles.textBoxContent}
+              >
+                <TextInput
+                  style={{
+                    fontSize: box.fontSize,
+                    color: box.color,
+                    fontWeight: box.isBold ? 'bold' : 'normal',
+                    fontStyle: box.isItalic ? 'italic' : 'normal',
+                  }}
+                  value={box.text}
+                  onChangeText={(text) =>
+                    setTextBoxes((prev) =>
+                      prev.map((b) => (b.id === box.id ? { ...b, text } : b))
+                    )
+                  }
+                  editable={mode === 'text' && selectedTextBox === box.id}
+                  pointerEvents={mode === 'text' ? 'auto' : 'none'}
+                />
+              </TouchableOpacity>
+              {selectedTextBox === box.id && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowTextStyleControls(!showTextStyleControls);
+                  }}
+                  style={styles.textStyleButton}
+                >
+                  <FontAwesome name="cog" size={16} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ))}
+
+        {/* Text Style Controls */}
+        {showTextStyleControls && selectedTextBox && (
+          <View style={[
+            styles.textStyleControls,
+            {
+              position: 'absolute',
+              left: (textBoxes.find(b => b.id === selectedTextBox)?.x || 0) + (textBoxes.find(b => b.id === selectedTextBox)?.width || 0) + 10,
+              top: textBoxes.find(b => b.id === selectedTextBox)?.y || 0,
+            }
+          ]}>
+            <View style={styles.textStyleSection}>
+              <Text style={styles.textStyleLabel}>Color:</Text>
+              <View style={styles.textColorPicker}>
+                <TouchableOpacity 
+                  style={[styles.colorButton, { backgroundColor: '#ffffff' }]} 
+                  onPress={() => handleTextStyleChange('color', '#ffffff')} 
+                />
+                <TouchableOpacity 
+                  style={[styles.colorButton, { backgroundColor: '#ff0000' }]} 
+                  onPress={() => handleTextStyleChange('color', '#ff0000')} 
+                />
+                <TouchableOpacity 
+                  style={[styles.colorButton, { backgroundColor: '#00ff00' }]} 
+                  onPress={() => handleTextStyleChange('color', '#00ff00')} 
+                />
+                <TouchableOpacity 
+                  style={[styles.colorButton, { backgroundColor: '#0000ff' }]} 
+                  onPress={() => handleTextStyleChange('color', '#0000ff')} 
+                />
+                <TouchableOpacity 
+                  style={[styles.colorButton, { backgroundColor: '#ffff00' }]} 
+                  onPress={() => handleTextStyleChange('color', '#ffff00')} 
+                />
+                <TouchableOpacity 
+                  style={[styles.colorButton, { backgroundColor: '#ff00ff' }]} 
+                  onPress={() => handleTextStyleChange('color', '#ff00ff')} 
+                />
+              </View>
+            </View>
+            <View style={styles.textStyleSection}>
+              <Text style={styles.textStyleLabel}>Size:</Text>
+              <View style={styles.textSizePicker}>
+                <TouchableOpacity 
+                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 12 && styles.selectedTextSize]} 
+                  onPress={() => handleTextStyleChange('fontSize', 12)} 
+                >
+                  <Text style={styles.textSizeText}>12</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 16 && styles.selectedTextSize]} 
+                  onPress={() => handleTextStyleChange('fontSize', 16)} 
+                >
+                  <Text style={styles.textSizeText}>16</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 20 && styles.selectedTextSize]} 
+                  onPress={() => handleTextStyleChange('fontSize', 20)} 
+                >
+                  <Text style={styles.textSizeText}>20</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 24 && styles.selectedTextSize]} 
+                  onPress={() => handleTextStyleChange('fontSize', 24)} 
+                >
+                  <Text style={styles.textSizeText}>24</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 28 && styles.selectedTextSize]} 
+                  onPress={() => handleTextStyleChange('fontSize', 28)} 
+                >
+                  <Text style={styles.textSizeText}>28</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.textSizeButton, textBoxes.find(b => b.id === selectedTextBox)?.fontSize === 32 && styles.selectedTextSize]} 
+                  onPress={() => handleTextStyleChange('fontSize', 32)} 
+                >
+                  <Text style={styles.textSizeText}>32</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Render images */}
         {images.map((img) => (
@@ -717,6 +827,70 @@ const styles = StyleSheet.create({
   },
   undoButton: {
     padding: 8,
+  },
+  textBoxHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  textBoxContent: {
+    flex: 1,
+  },
+  textStyleButton: {
+    padding: 5,
+    marginLeft: 5,
+  },
+  textStyleControls: {
+    backgroundColor: '#2e2b2b',
+    padding: 10,
+    borderRadius: 6,
+    zIndex: 1000,
+    width: 120,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  textStyleSection: {
+    marginBottom: 8,
+  },
+  textStyleLabel: {
+    color: '#ffffff',
+    marginBottom: 2,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  textColorPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  textSizePicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  textSizeButton: {
+    width: 25,
+    height: 25,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#757474',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  selectedTextSize: {
+    backgroundColor: '#757474',
+  },
+  textSizeText: {
+    color: '#ffffff',
+    fontSize: 11,
   },
 });
 
