@@ -1,6 +1,8 @@
 # Welcome to OmniNote Mobile App 👋
 
-This is an [Expo](https://expo.dev) project using React Native.
+This is one of our final year project deliverables, check our [website](https://wp2024.cs.hku.hk/fyp24088/) for more project details.
+
+It is an [Expo](https://expo.dev) mobile app project using React Native.
 
 ## Get started
 
