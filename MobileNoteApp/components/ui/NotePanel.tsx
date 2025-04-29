@@ -51,12 +51,54 @@ interface ImageElement {
 // Each stroke is just an array of [x, y] points
 type Stroke = { x: number; y: number }[];
 
+// Smooth points using a moving average with reduced smoothing
+function smoothPoints(points: Stroke): Stroke {
+  if (points.length < 3) return points;
+  
+  const smoothed: Stroke = [];
+  const windowSize = 2; // Reduced window size for less smoothing
+  const smoothingFactor = 0.3; // Reduced smoothing factor
+  
+  for (let i = 0; i < points.length; i++) {
+    let sumX = 0;
+    let sumY = 0;
+    let count = 0;
+    
+    // Calculate moving average with reduced window
+    for (let j = Math.max(0, i - windowSize + 1); j <= Math.min(points.length - 1, i + windowSize - 1); j++) {
+      sumX += points[j].x;
+      sumY += points[j].y;
+      count++;
+    }
+    
+    // Apply smoothing factor to blend original and smoothed points
+    const smoothedX = (sumX / count) * smoothingFactor + points[i].x * (1 - smoothingFactor);
+    const smoothedY = (sumY / count) * smoothingFactor + points[i].y * (1 - smoothingFactor);
+    
+    smoothed.push({
+      x: smoothedX,
+      y: smoothedY
+    });
+  }
+  
+  return smoothed;
+}
+
 // Convert an array of points into an SVG path string
 function pointsToSvgPath(points: Stroke): string {
   if (points.length === 0) return '';
-  // Move to first point, then line-to every subsequent point
-  const d = points.map((p, i) => (i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`));
-  return d.join(' ');
+  
+  // Smooth the points using the modified algorithm
+  const smoothedPoints = smoothPoints(points);
+  
+  // Use a simpler path construction for more natural strokes
+  let d = `M${smoothedPoints[0].x},${smoothedPoints[0].y}`;
+  
+  for (let i = 1; i < smoothedPoints.length; i++) {
+    d += ` L${smoothedPoints[i].x},${smoothedPoints[i].y}`;
+  }
+  
+  return d;
 }
 
 const NotePanel = forwardRef((props, ref) => {
@@ -687,6 +729,8 @@ const NotePanel = forwardRef((props, ref) => {
             d={pointsToSvgPath(stroke)}
             stroke={strokeColor}
             strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             fill="none"
           />
         ))}
@@ -695,6 +739,8 @@ const NotePanel = forwardRef((props, ref) => {
             d={pointsToSvgPath(currentPath)}
             stroke={strokeColor}
             strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             fill="none"
           />
         )}
@@ -1110,6 +1156,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 5,
     backgroundColor: 'transparent',
+    height: 40,
+    width: 100,
   },
   footer: {
     padding: 10,
